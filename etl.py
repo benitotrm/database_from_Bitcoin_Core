@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 
 #%% ###################### Populate _transactions_parquets ###################### 
-# ################################## Populate _transactions_parquets ################################
+# ######################## Populate _transactions_parquets ################################
 # Constants for batch processing
 START_BLOCK = 667100
 END_BLOCK = 667200
