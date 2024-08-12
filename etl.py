@@ -11,60 +11,8 @@ from dask import delayed
 import pyarrow.parquet as pq
 import pyarrow as pa
 
-#%% ###################### Configure Bitcoin RPC connection ######################
-# Configure Bitcoin RPC connection
-rpc_user = os.environ.get('rpcuser')
-rpc_password = os.environ.get('rpcpassword')
-
-if rpc_user is None or rpc_password is None:
-    raise EnvironmentError("RPC_USER and/or RPC_PASSWORD environment variables not set.")
-
-url = "http://127.0.0.1:8332"
-rpc_host = "127.0.0.1"
-rpc_port = "8332"
-rpc_url = f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}"
-
-#%% ###################### Instantiate rpc_all function ###################### 
-# Instantiate functions
-HEADERS = {'content-type': 'text/plain'}
-MAX_RETRIES = 3
-
-def rpc_call_batch(method, param_list):
-    responses = []
-    payload = json.dumps([{"jsonrpc": "2.0", "id": str(index), "method": method, "params": params} for index, params in enumerate(param_list)])
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = requests.post(rpc_url, headers=HEADERS, data=payload)
-            response.raise_for_status()
-            batch_response = response.json()
-            if all('error' not in resp or resp['error'] is None for resp in batch_response):
-                return batch_response
-            else:
-                errors = [resp['error'] for resp in batch_response if 'error' in resp and resp['error']]
-                print(f"RPC Batch Error at attempt {attempt}: {errors}")
-        except (requests.exceptions.HTTPError, requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            print(f"RPC Batch Attempt {attempt} failed with error: {e}")
-            if attempt < MAX_RETRIES:
-                time.sleep(5)  # Implement exponential backoff if needed
-
-    return [None] * len(param_list)
-
-# Define the method and parameters for batch testing
-method = "getblockhash"
-param_list = [[100000], [200000], [300000]]  # Assuming 'getblockhash' takes a single parameter, the block height
-
-# Make the batch RPC call
-responses = rpc_call_batch(method, param_list)
-
-# Print the results of the batch call
-for i, response in enumerate(responses):
-    if response is not None:
-        print(f"Successfully fetched data for block height {param_list[i][0]}: {response}")
-    else:
-        print(f"Failed to fetch data for block height {param_list[i][0]}")
-
 #%% ###################### Populate _transactions_parquets ###################### 
-# ################################## Populate _transactions_parquets ################################
+# ######################## Populate _transactions_parquets ################################
 # Constants for batch processing
 START_BLOCK = 667100
 END_BLOCK = 667200

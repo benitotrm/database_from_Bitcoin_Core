@@ -1,1 +1,8 @@
+# Environments
 venv
+
+# Database folders
+blocks.parquets
+
+# Workflow
+run_workflow.sh

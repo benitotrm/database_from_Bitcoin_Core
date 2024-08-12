@@ -1,10 +1,3 @@
-#%% ###################### Import libraries ######################
-# ###################### Import libraries ######################
-import dask.dataframe as dd
-import dask.array as da
-import polars as pl
-import pandas as pd
-
 #%% ###################### Sample  ####################################
 #    ################################## Sample  ####################################
 pd.set_option('display.max_colwidth', 0)
@@ -54,56 +47,6 @@ def display_transaction_sample(df, num_rows=5):
 
 # print("\nRaw Transactions DataFrame Sample:")
 # display_transaction_sample(transactions_sample)
-
-#%% ###################### Blocks DQ  ####################################
-#   ###################### Blocks DQ  ####################################
-# Read blocks.parquet into a Polars DataFrame
-blocks_df = pl.read_parquet('_blocks.parquet')
-
-def count_blocks():
-    count = len(blocks_df)
-    print("Count of blocks:", count)
-
-count_blocks()
-
-def check_for_duplicate_blocks():
-    duplicate_blocks = blocks_df.group_by('block_hash').agg(pl.count().alias('count')).filter(pl.col('count') > 1)
-    if len(duplicate_blocks) == 0:
-        print("No duplicate blocks found.")
-    else:
-        print("Duplicate blocks found:")
-        print(duplicate_blocks)
-
-def test_blocks_table():
-    # Test for consecutive height
-    sorted_blocks = blocks_df.sort('height')
-    heights = sorted_blocks['height']
-    if not heights.is_sorted() or (heights.diff().fill_null(0).max() > 1):
-        print("Block height not consecutive.")
-        return False
-
-    # Test for non-empty hash, time, and tx_count
-    null_counts = blocks_df.select(['block_hash', 'time', 'tx_count']).null_count()
-    if null_counts.sum(axis=0).to_series().sum() > 0:
-        print("Found rows with NULL hash, time, or tx_count.")
-        return False
-
-    # Test min and max tx_count
-    min_tx_count = blocks_df['tx_count'].min()
-    avg_tx_count = blocks_df['tx_count'].mean()
-    max_tx_count = blocks_df['tx_count'].max()
-    print(f"Min tx_count: {min_tx_count}, Avg tx_count: {avg_tx_count}, Max tx_count: {max_tx_count}")
-
-    print("All tests passed.")
-    return True
-
-test_result = test_blocks_table()
-
-def query_blocks():
-    print(blocks_df.head(10))
-
-query_blocks()
-
 
 #%% ###################### Transactions DQ (Dask) ######################
 ###################### Transactions DQ (Dask) ####################################
