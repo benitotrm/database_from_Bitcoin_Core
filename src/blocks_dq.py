@@ -3,10 +3,7 @@
 import os
 import dask.dataframe as dd
 
-# Adjust the path to your blocks.parquets directory
-parquet_dir = os.path.join(os.path.dirname(__file__), '../blocks.parquets')
-
-# Read all Parquet files in the blocks.parquets directory into a Dask DataFrame
+parquet_dir = os.path.join(os.path.dirname(__file__), '../database/consolidated_blocks.parquets')
 blocks_df = dd.read_parquet(parquet_dir)
 
 def count_blocks():

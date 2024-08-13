@@ -1,8 +1,10 @@
 # Environments
 venv
+database_from_Bitcoin_Core.egg-info
 
 # Database folders
-blocks.parquets
+database
 
 # Workflow
 run_workflow.sh
+workflow.log

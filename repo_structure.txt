@@ -1,0 +1,30 @@
+.
+├── dq.py
+├── etl.py
+├── graph_build.py
+├── README.md
+├── repo_structure.txt
+├── requirements.txt
+├── run_workflow.sh
+├── src
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   └── rpc_client.cpython-312.pyc
+│   │   └── rpc_client.py
+│   ├── blocks_dq.py
+│   ├── __init__.py
+│   ├── populate_blocks.py
+│   └── __pycache__
+│       ├── __init__.cpython-312.pyc
+│       └── populate_blocks.cpython-312.pyc
+├── tests
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   └── test_rpc_client.cpython-312.pyc
+│   └── test_rpc_client.py
+└── workflow.log
+
+7 directories, 21 files
