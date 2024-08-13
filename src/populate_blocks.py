@@ -112,13 +112,14 @@ def populate_blocks(start=None, end=None):
     # Consolidate small Parquet files into larger files
     consolidate_parquet_files(output_directory, consolidated_output_directory)
 
+    # Safely delete the unconsolidated Parquet files after consolidation
+    delete_unconsolidated_files(output_directory, consolidated_output_directory)
+
     print("Populating blocks table completed.")
 
 def consolidate_parquet_files(input_directory, output_directory):
     """Consolidates small Parquet files into larger files of approximately 1GB"""
-
     df = dd.read_parquet(f'{input_directory}/*.parquet')
-
     target_partition_size = 1e9  # 1GB in bytes
     current_size = df.memory_usage(deep=True).sum().compute()
     npartitions = max(1, int(current_size / target_partition_size))
@@ -128,6 +129,16 @@ def consolidate_parquet_files(input_directory, output_directory):
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
+def delete_unconsolidated_files(input_directory, consolidated_output_directory):
+    """Deletes the unconsolidated Parquet files only if the consolidation was successful"""
+    if os.path.exists(consolidated_output_directory) and os.listdir(consolidated_output_directory):
+        print(f"Deleting unconsolidated Parquet files in {input_directory}...")
+        for file in os.listdir(input_directory):
+            if file.endswith(".parquet"):
+                os.remove(os.path.join(input_directory, file))
+        print(f"Unconsolidated Parquet files deleted from {input_directory}.")
+    else:
+        print("Consolidation failed or no consolidated files found. Unconsolidated files not deleted.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Populate the blocks.parquets folder with block information.")
@@ -136,4 +147,3 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     populate_blocks(start=args.start, end=args.end)
-
