@@ -1,11 +1,12 @@
+"""Module to populate the Blocks section of the database"""
 import os
 import json
+import argparse
 import requests
 import pandas as pd
 import dask.dataframe as dd
 import pyarrow as pa
 from src.api.rpc_client import RPCClient
-import argparse
 
 # Define the schema using pyarrow
 blocks_schema = pa.schema([
@@ -44,10 +45,10 @@ def fetch_block_data(block_height, rpc_client):
         print(f"Missing expected data in block {block_height}: {key_err}")
     return None
 
-def get_max_block_height_on_file(output_directory):
+def get_max_block_height_on_file(consolidated_output_directory):
     """Returns the maximum block height available in the existing Parquet files"""
-    if os.path.exists(output_directory):
-        parquet_files = [os.path.join(output_directory, f) for f in os.listdir(output_directory) if f.endswith(".parquet")]
+    if os.path.exists(consolidated_output_directory):
+        parquet_files = [os.path.join(consolidated_output_directory, f) for f in os.listdir(consolidated_output_directory) if f.endswith(".parquet")]
         if parquet_files:
             existing_blocks_df = dd.read_parquet(parquet_files)
             if existing_blocks_df.shape[0].compute() > 0:
@@ -66,12 +67,16 @@ def populate_blocks(start=None, end=None):
     """Populates the blocks.parquets folder with Block information"""
     rpc_client = RPCClient()
     batch_size = 1000
-    output_directory = "blocks.parquets"
+    output_directory = "database/blocks.parquets"
+    consolidated_output_directory = "database/consolidated_blocks.parquets"
 
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
-    max_block_height_on_file = get_max_block_height_on_file(output_directory)
+    if not os.path.exists(consolidated_output_directory):
+        os.makedirs(consolidated_output_directory)
+
+    max_block_height_on_file = get_max_block_height_on_file(consolidated_output_directory)
     latest_block_height_from_node = get_latest_block_height_from_node(rpc_client)
 
     # Set start and end defaults if not provided
@@ -104,7 +109,25 @@ def populate_blocks(start=None, end=None):
         ddf = dd.from_pandas(pd.DataFrame(data), npartitions=1)
         ddf.to_parquet(output_directory, append=True, write_index=False, schema=blocks_schema)
 
+    # Consolidate small Parquet files into larger files
+    consolidate_parquet_files(output_directory, consolidated_output_directory)
+
     print("Populating blocks table completed.")
+
+def consolidate_parquet_files(input_directory, output_directory):
+    """Consolidates small Parquet files into larger files of approximately 1GB"""
+
+    df = dd.read_parquet(f'{input_directory}/*.parquet')
+
+    target_partition_size = 1e9  # 1GB in bytes
+    current_size = df.memory_usage(deep=True).sum().compute()
+    npartitions = max(1, int(current_size / target_partition_size))
+
+    df = df.repartition(npartitions=npartitions)
+    df.to_parquet(output_directory, write_metadata_file=True)
+
+    print(f"Consolidated Parquet files written to {output_directory}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Populate the blocks.parquets folder with block information.")
@@ -113,3 +136,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     populate_blocks(start=args.start, end=args.end)
+
