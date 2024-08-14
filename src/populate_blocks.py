@@ -100,14 +100,14 @@ def populate_blocks(start=None, end=None):
 
         if len(data) >= batch_size:
             ddf = dd.from_pandas(pd.DataFrame(data), npartitions=1)
-            ddf.to_parquet(output_directory, append=True, write_index=False, schema=blocks_schema)
+            ddf.to_parquet(output_directory, append=True, schema=blocks_schema, write_index=False)
             data = []
             print(f"Saved up to block {block_height}")
 
     # Write remaining data
     if data:
         ddf = dd.from_pandas(pd.DataFrame(data), npartitions=1)
-        ddf.to_parquet(output_directory, append=True, write_index=False, schema=blocks_schema)
+        ddf.to_parquet(output_directory, append=True, schema=blocks_schema, write_index=False)
 
     # Consolidate small Parquet files into larger files
     consolidate_parquet_files(output_directory, consolidated_output_directory)
@@ -119,13 +119,31 @@ def populate_blocks(start=None, end=None):
 
 def consolidate_parquet_files(input_directory, output_directory):
     """Consolidates small Parquet files into larger files of approximately 1GB"""
-    df = dd.read_parquet(f'{input_directory}/*.parquet')
+
+    # Load existing legacy data from the consolidated directory if it exists
+    if os.path.exists(output_directory) and os.listdir(output_directory):
+        existing_df = dd.read_parquet(f'{output_directory}/*.parquet')
+    else:
+        existing_df = None
+
+    # Load new data from the input directory
+    new_df = dd.read_parquet(f'{input_directory}/*.parquet')
+
+    # Combine existing legacy data with the new data
+    if existing_df is not None:
+        combined_df = dd.concat([existing_df, new_df])
+    else:
+        combined_df = new_df
+
+    # Repartition the combined dataframe to target 1GB file sizes
     target_partition_size = 1e9  # 1GB in bytes
-    current_size = df.memory_usage(deep=True).sum().compute()
+    current_size = combined_df.memory_usage(deep=True).sum().compute()
     npartitions = max(1, int(current_size / target_partition_size))
 
-    df = df.repartition(npartitions=npartitions)
-    df.to_parquet(output_directory, write_metadata_file=True)
+    combined_df = combined_df.repartition(npartitions=npartitions)
+
+    # Write the combined data back to the consolidated output directory
+    combined_df.to_parquet(output_directory)
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
@@ -138,12 +156,13 @@ def delete_unconsolidated_files(input_directory, consolidated_output_directory):
                 os.remove(os.path.join(input_directory, file))
         print(f"Unconsolidated Parquet files deleted from {input_directory}.")
     else:
-        print("Consolidation failed or no consolidated files found. Unconsolidated files not deleted.")
+        print("Files found. Unconsolidated files not deleted.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Populate the blocks.parquets folder with block information.")
-    parser.add_argument("--start", type=int, help="Starting block height")
-    parser.add_argument("--end", type=int, help="Ending block height")
-    
+    parser = argparse.ArgumentParser(description="Populate blocks folder.")
+    parser.add_argument("--start", type=int, help="Starting block height.")
+    parser.add_argument("--end", type=int, help="Ending block height.")
+
     args = parser.parse_args()
     populate_blocks(start=args.start, end=args.end)
+

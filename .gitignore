@@ -5,6 +5,7 @@ database_from_Bitcoin_Core.egg-info
 # Database folders
 database
 
-# Workflow
-run_workflow.sh
+# Workflow files
+# run_workflow.sh
 workflow.log
+workflow*
