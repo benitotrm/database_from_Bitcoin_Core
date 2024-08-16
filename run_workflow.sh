@@ -34,11 +34,11 @@ source ~/Projects/database_from_Bitcoin_Core/venv/bin/activate
 
 # Run the populate_blocks script
 echo "Running populate_blocks.py..."
-python -u src/populate_blocks.py
+python -u src/blocks/populate_blocks.py
 
 # Run the data quality checks
 echo "Running blocks_dq.py..."
-python -u src/blocks_dq.py
+python -u src/blocks/blocks_dq.py
 
 # Deactivate the virtual environment
 echo "Deactivating virtual environment..."
