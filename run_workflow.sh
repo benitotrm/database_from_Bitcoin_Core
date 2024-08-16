@@ -4,7 +4,7 @@
 cd ~/Projects/database_from_Bitcoin_Core
 
 # Define log file location with timestamp
-LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_$(date +"%Y%m%d_%H%M%S").log
+LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_logs/workflow_$(date +"%Y%m%d_%H%M%S").log
 
 # Define lock file location
 LOCKFILE=/tmp/myjob.lock

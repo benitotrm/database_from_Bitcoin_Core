@@ -7,5 +7,7 @@ database
 
 # Workflow files
 # run_workflow.sh
-workflow.log
-workflow*
+workflow_logs
+
+# Misc
+todo.txt

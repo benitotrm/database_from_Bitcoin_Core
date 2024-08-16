@@ -2,17 +2,6 @@
 
 This guide is focused on Linux, but all steps should be replicable on Windows.
 
-## General setup
-
-Setting up a virual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -e . 
-```
-
-And you can use 'deactivate' on the bash when done.
-
 ## RPC API setup 
 
 This guide assumes you're alredy running a full bitcoin node on your machine and have properly configured the RCP API. If this is not the case please follow these instructions first: https://bitcoin.org/en/full-node. Once your node is fully synced you can start using this repo to generate your database. 
@@ -24,6 +13,16 @@ I'ts important you run the following unit test first, as they are focused on ens
 ```bash
 python -m unittest discover
 ```
+## Python environment setup
+
+Setting up a virual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -e . 
+```
+
+And you can use 'deactivate' on the bash when done.
 
 ## ETL process
 The following commands execute the complete population of each dataset:

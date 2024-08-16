@@ -1,6 +1,7 @@
 """Module to populate the Blocks section of the database"""
 import os
 import json
+import shutil
 import argparse
 import requests
 import pandas as pd
@@ -67,8 +68,8 @@ def populate_blocks(start=None, end=None):
     """Populates the blocks.parquets folder with Block information"""
     rpc_client = RPCClient()
     batch_size = 1000
-    output_directory = "database/blocks.parquets"
-    consolidated_output_directory = "database/consolidated_blocks.parquets"
+    output_directory = "database/blocks_batches"
+    consolidated_output_directory = "database/blocks"
 
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
@@ -113,7 +114,7 @@ def populate_blocks(start=None, end=None):
     consolidate_parquet_files(output_directory, consolidated_output_directory)
 
     # Safely delete the unconsolidated Parquet files after consolidation
-    delete_unconsolidated_files(output_directory, consolidated_output_directory)
+    delete_unconsolidated_directory(output_directory, consolidated_output_directory)
 
     print("Populating blocks table completed.")
 
@@ -147,16 +148,17 @@ def consolidate_parquet_files(input_directory, output_directory):
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
-def delete_unconsolidated_files(input_directory, consolidated_output_directory):
-    """Deletes the unconsolidated Parquet files only if the consolidation was successful"""
+def delete_unconsolidated_directory(input_directory, consolidated_output_directory):
+    """Deletes the entire input directory if the consolidation was successful"""
     if os.path.exists(consolidated_output_directory) and os.listdir(consolidated_output_directory):
-        print(f"Deleting unconsolidated Parquet files in {input_directory}...")
-        for file in os.listdir(input_directory):
-            if file.endswith(".parquet"):
-                os.remove(os.path.join(input_directory, file))
-        print(f"Unconsolidated Parquet files deleted from {input_directory}.")
+        print(f"Preparing to erase {input_directory} from existence...")
+        try:
+            shutil.rmtree(input_directory)
+            print(f"{input_directory} has been vaporized.")
+        except Exception as e:
+            print(f"Failed to delete {input_directory}. Error: {e}")
     else:
-        print("Files found. Unconsolidated files not deleted.")
+        print("Consolidation not confirmed. Directory spared for now.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Populate blocks folder.")
