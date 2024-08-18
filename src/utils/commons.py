@@ -50,7 +50,7 @@ def consolidate_parquet_files(input_directory, output_directory):
     current_size = combined_df.memory_usage(deep=True).sum().compute()
     npartitions = max(1, int(current_size / partition_size))
 
-    combined_df = combined_df.repartition(partitions=npartitions)
+    combined_df = combined_df.repartition(npartitions=npartitions)
 
     # Write the combined data back to the consolidated output directory
     combined_df.to_parquet(output_directory)
