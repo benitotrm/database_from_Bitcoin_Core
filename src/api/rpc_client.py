@@ -1,9 +1,11 @@
+'''Module to connect to the Bitcoin Core RPC API'''
 import os
-import requests
 import json
 import time
+import requests
 
 class RPCClient:
+    '''RPC API Client object generator.'''
     def __init__(self, rpc_user=None, rpc_password=None, rpc_host="127.0.0.1", rpc_port="8332"):
         self.rpc_user = rpc_user or os.environ.get('RPC_USER')
         self.rpc_password = rpc_password or os.environ.get('RPC_PASSWORD')
@@ -15,7 +17,8 @@ class RPCClient:
         self.max_retries = 3
 
     def rpc_call_batch(self, method, param_list):
-        responses = []
+        '''Creates a batch of calls to the RPC API, sends it and retrieve the information.'''
+        # responses = []
         payload = json.dumps([{
             "jsonrpc": "2.0", 
             "id": str(index), 
@@ -25,7 +28,7 @@ class RPCClient:
         
         for attempt in range(1, self.max_retries + 1):
             try:
-                response = requests.post(self.rpc_url, headers=self.headers, data=payload)
+                response = requests.post(self.rpc_url, headers=self.headers, data=payload, timeout=10)
                 response.raise_for_status()
                 batch_response = response.json()
                 
