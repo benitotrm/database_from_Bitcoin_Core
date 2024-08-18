@@ -1,5 +1,6 @@
 # Environments
 venv
+__pycache__
 database_from_Bitcoin_Core.egg-info
 
 # Database folders
