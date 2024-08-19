@@ -3,6 +3,9 @@ import os
 import json
 import time
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class RPCClient:
     '''RPC API Client object generator.'''

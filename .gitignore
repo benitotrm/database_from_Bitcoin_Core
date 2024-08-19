@@ -1,4 +1,5 @@
 # Environments
+.env
 venv
 __pycache__
 database_from_Bitcoin_Core.egg-info
