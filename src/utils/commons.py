@@ -2,8 +2,19 @@
 import os
 import errno
 import shutil
+import subprocess
 import pandas as pd
 import dask.dataframe as dd
+
+def get_current_branch():
+    '''Returns the name of the current branch'''
+    try:
+        # Get the current branch name
+        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], universal_newlines=True).strip()
+        return branch
+    except subprocess.CalledProcessError:
+        # Handle case where git command fails (e.g., not in a git repo)
+        return 'unknown'
 
 def get_max_block_height_on_file(env):
     """Returns the maximum block height available in the existing Parquet files"""

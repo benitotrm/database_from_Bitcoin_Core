@@ -7,10 +7,11 @@ import pandas as pd
 import dask.dataframe as dd
 import pyarrow as pa
 from src.api.rpc_client import RPCClient
-from src.utils.commons import get_max_block_height_on_file
+from src.utils.commons import get_current_branch, get_max_block_height_on_file
 from src.utils.commons import consolidate_parquet_files, delete_unconsolidated_directory
 
-branch_name = os.environ.get('BRANCH_NAME', 'default-branch')
+branch_name = get_current_branch()
+print(f"Current branch: {branch_name}")
 
 if branch_name == 'main':
     ENV = 'main'
