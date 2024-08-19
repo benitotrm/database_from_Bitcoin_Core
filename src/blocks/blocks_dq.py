@@ -1,8 +1,10 @@
 """Module to run a Data Quality check on the block.parquets"""
 import os
 import dask.dataframe as dd
+from src.utils.commons import get_current_branch
 
-branch_name = os.environ.get('BRANCH_NAME', 'default-branch')
+branch_name = get_current_branch()
+print(f"Current branch: {branch_name}")
 
 if branch_name == 'main':
     ENV = 'main'
