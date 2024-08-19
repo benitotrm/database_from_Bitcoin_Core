@@ -1,0 +1,41 @@
+name: Run Bitcoin Core Workflow
+
+on:
+  schedule:
+    - cron: '0 0 * * *' 
+
+jobs:
+  run-workflow:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.x' 
+
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+
+    - name: Run populate_blocks.py
+      run: |
+        source venv/bin/activate
+        python src/blocks/populate_blocks.py
+
+    - name: Run blocks_dq.py
+      run: |
+        source venv/bin/activate
+        python src/blocks/blocks_dq.py
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: workflow-logs
+        path: workflow_logs/
