@@ -2,7 +2,11 @@
 
 This guide is focused on Linux, but all steps should be replicable on Windows.
 
-## General setup
+## Bitcoin Core setup
+
+This guide assumes you're alredy running a full bitcoin node on your machine and have properly configured the RCP API. If this is not the case please follow these instructions first: https://bitcoin.org/en/full-node. Once your node is fully synced you can start using this repo to generate your database. 
+
+## Python environment setup
 
 Setting up a virual environment:
 ```bash
@@ -10,16 +14,16 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -e . 
 ```
-
 And you can use 'deactivate' on the bash when done.
 
-## RPC API setup 
+You need to set your RPC API credentials `rpc_user` and `rpc_password` for the code to work. Use the python-dotenv library and add them to a .env file on your root folder like this:
 
-This guide assumes you're alredy running a full bitcoin node on your machine and have properly configured the RCP API. If this is not the case please follow these instructions first: https://bitcoin.org/en/full-node. Once your node is fully synced you can start using this repo to generate your database. 
+```bash
+RPC_USER=your_rpc_username
+RPC_PASSWORD=your_rpc_password
+```
 
-Go to /src/api/rpc_client.py and set `rpc_user` and `rpc_password` with your actual credentials. We strongly recommend you set these variables globally and not to hardcode them. For this doing this on Linux, add them to your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`) with names `RPC_USER` and `RPC_PASSWORD` and reload the configuration. For doing this on Windows you have to set them up as environment variables.
-
-I'ts important you run the following unit test first, as they are focused on ensuring the API is properly set up. 
+Then, it's important you run the following unit test first, as they are focused on ensuring the API is properly set up. 
 
 ```bash
 python -m unittest discover

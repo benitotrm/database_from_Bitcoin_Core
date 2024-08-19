@@ -1,10 +1,15 @@
 # Environments
+.env
 venv
+__pycache__
 database_from_Bitcoin_Core.egg-info
 
 # Database folders
 database
 
-# Workflow
-run_workflow.sh
-workflow.log
+# Workflow files
+# run_workflow.sh
+workflow_logs
+
+# Misc
+todo.txt
