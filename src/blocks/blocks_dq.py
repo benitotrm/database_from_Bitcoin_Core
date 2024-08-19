@@ -1,5 +1,4 @@
 """Module to run a Data Quality check on the block.parquets"""
-
 import os
 import dask.dataframe as dd
 
@@ -10,7 +9,7 @@ if branch_name == 'main':
 else:
     ENV = 'dev'
 
-parquet_dir = os.path.join(os.path.dirname(__file__), '../../database/blocks_{ENV}')
+parquet_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{ENV}')
 blocks_df = dd.read_parquet(parquet_dir)
 
 def count_blocks():
