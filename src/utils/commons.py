@@ -5,16 +5,9 @@ import shutil
 import pandas as pd
 import dask.dataframe as dd
 
-branch_name = os.environ.get('BRANCH_NAME', 'default-branch')
-
-if branch_name == 'main':
-    ENV = 'main'
-else:
-    ENV = 'dev'
-
-def get_max_block_height_on_file():
+def get_max_block_height_on_file(env):
     """Returns the maximum block height available in the existing Parquet files"""
-    blocks_directory = 'database/blocks_{ENV}'
+    blocks_directory = f'database/blocks_{env}'
     if os.path.exists(blocks_directory):
         parquet_files = [
             os.path.join(blocks_directory, f)

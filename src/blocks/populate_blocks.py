@@ -75,7 +75,7 @@ def populate_blocks(start=None, end=None):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
-    max_block_height_on_file = get_max_block_height_on_file()
+    max_block_height_on_file = get_max_block_height_on_file(env=ENV)
     latest_block_height_from_node = get_latest_block_height_from_node(rpc_client)
 
     # Set start and end defaults if not provided
