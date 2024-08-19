@@ -22,6 +22,7 @@ touch $LOCKFILE
 exec > >(tee -a $LOGFILE) 2>&1
 
 # Log the current branch before switching
+ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Current branch before switch: $(git rev-parse --abbrev-ref HEAD)"
 
 # Switch to main branch
@@ -52,7 +53,6 @@ echo "Deactivating virtual environment..."
 deactivate
 
 # Switch back to the original branch
-ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Switching back to original branch: $ORIGINAL_BRANCH"
 git checkout -
 
