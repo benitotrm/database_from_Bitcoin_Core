@@ -3,7 +3,14 @@
 import os
 import dask.dataframe as dd
 
-parquet_dir = os.path.join(os.path.dirname(__file__), '../../database/blocks')
+branch_name = os.environ.get('BRANCH_NAME', 'default-branch')
+
+if branch_name == 'main':
+    ENV = 'main'
+else:
+    ENV = 'dev'
+
+parquet_dir = os.path.join(os.path.dirname(__file__), '../../database/blocks_{ENV}')
 blocks_df = dd.read_parquet(parquet_dir)
 
 def count_blocks():
@@ -12,6 +19,7 @@ def count_blocks():
     print("Count of blocks:", count)
 
 def check_for_duplicate_blocks():
+    '''Ensure there are no duplicate blocks'''
     duplicate_blocks = blocks_df.groupby('block_hash').size().reset_index()
     duplicate_blocks = duplicate_blocks.rename(columns={0: 'count'})
     duplicate_blocks = duplicate_blocks[duplicate_blocks['count'] > 1]
@@ -23,6 +31,7 @@ def check_for_duplicate_blocks():
         print(duplicate_blocks.compute())
 
 def test_blocks_table():
+    '''Runs a series of test to ensure data integrity'''
     # Test for consecutive height
     sorted_blocks = blocks_df.sort_values('height')
     heights = sorted_blocks['height'].compute()
@@ -54,6 +63,7 @@ def test_blocks_table():
     return True
 
 def query_blocks():
+    '''Generates a sample of the block data'''
     print(blocks_df.head(10))
 
 if __name__ == "__main__":

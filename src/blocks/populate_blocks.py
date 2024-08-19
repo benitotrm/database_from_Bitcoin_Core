@@ -10,6 +10,13 @@ from src.api.rpc_client import RPCClient
 from src.utils.commons import get_max_block_height_on_file
 from src.utils.commons import consolidate_parquet_files, delete_unconsolidated_directory
 
+branch_name = os.environ.get('BRANCH_NAME', 'default-branch')
+
+if branch_name == 'main':
+    ENV = 'main'
+else:
+    ENV = 'dev'
+
 # Define the schema using pyarrow
 blocks_schema = pa.schema([
     ('block_hash', pa.string()),
@@ -59,8 +66,8 @@ def populate_blocks(start=None, end=None):
     """Populates the blocks.parquets folder with Block information"""
     rpc_client = RPCClient()
     batch_size = 1000
-    input_directory = "database/blocks_batches"
-    output_directory = "database/blocks"
+    input_directory = f"database/blocks_batches_{ENV}"
+    output_directory = f"database/blocks_{ENV}"
 
     if not os.path.exists(input_directory):
         os.makedirs(input_directory)
