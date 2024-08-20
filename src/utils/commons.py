@@ -58,7 +58,7 @@ def consolidate_parquet_files(input_directory, output_directory):
 
     # Repartition the combined dataframe target 1GB file sizes
     partition_size = 1e9  #1GB in bytes
-    current_size = combined_df.memory_usage(deep=True).sum()
+    current_size = combined_df.memory_usage(deep=True).sum().compute()
     npartitions = max(1, int(current_size / partition_size))
 
     combined_df = combined_df.repartition(npartitions=npartitions)
