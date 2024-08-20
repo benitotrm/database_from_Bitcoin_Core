@@ -52,19 +52,19 @@ def consolidate_parquet_files(input_directory, output_directory):
         combined_df = new_df
 
     # If the combined is empty, there's nothing to consolidate
-    if combined_df.isnull().all().all().compute():
+    if combined_df.isnull().all().all():
         print("No data to consolidate.")
         return
 
     # Repartition the combined dataframe target 1GB file sizes
     partition_size = 1e9  #1GB in bytes
-    current_size = combined_df.memory_usage(deep=True).sum().compute()
+    current_size = combined_df.memory_usage(deep=True).sum()
     npartitions = max(1, int(current_size / partition_size))
 
     combined_df = combined_df.repartition(npartitions=npartitions)
 
     # Write the combined data back to the consolidated output directory
-    combined_df.to_parquet(output_directory)
+    combined_df.to_parquet(output_directory, compute=False)
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
