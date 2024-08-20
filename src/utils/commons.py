@@ -52,7 +52,7 @@ def consolidate_parquet_files(input_directory, output_directory):
         combined_df = new_df
 
     # If the combined is empty, there's nothing to consolidate
-    if combined_df.isnull().all().all():
+    if combined_df.isnull().all().all().compute():
         print("No data to consolidate.")
         return
 
@@ -64,7 +64,7 @@ def consolidate_parquet_files(input_directory, output_directory):
     combined_df = combined_df.repartition(npartitions=npartitions)
 
     # Write the combined data back to the consolidated output directory
-    combined_df.to_parquet(output_directory, compute=False)
+    combined_df.to_parquet(output_directory)
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
