@@ -1,30 +1,42 @@
-# Load the transactions and blocks data
-transactions_directory = '_transactions_parquets'
+'''Module to run a Data Quality check on the transactions parquets'''
+import os
+import dask.dataframe as dd
+from src.utils.commons import get_current_branch
 
-transactions_df = os.path.join(transactions_directory, '*.parquet')
-df = dd.read_parquet(transactions_df)
-blocks_df = dd.read_parquet('_blocks.parquet')
+branch_name = get_current_branch()
+print(f"Current branch: {branch_name}")
+
+if branch_name == 'main':
+    ENV = 'main'
+else:
+    ENV = 'dev'
+
+blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{ENV}')
+blocks_df = dd.read_parquet(blocks_dir)
+
+transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{ENV}')
+transactions_df = dd.read_parquet(transactions_dir)
 
 # Persist the DataFrames in memory for faster access
-df = df.persist()
+transactions_df = transactions_df.persist()
 blocks_df = blocks_df.persist()
 
 # Calculate statistics
-unique_hashes = df['block_hash'].nunique()
-unique_tx = df['txid'].nunique()
-null_txid_count = df['txid'].isnull().sum()
-null_block_hash_count = df['block_hash'].isnull().sum()
+unique_hashes = transactions_df['block_hash'].nunique()
+unique_tx = transactions_df['txid'].nunique()
+null_txid_count = transactions_df['txid'].isnull().sum()
+null_block_hash_count = transactions_df['block_hash'].isnull().sum()
 
 # Perform all computations in a single step
 unique_hashes, unique_tx, null_txid_count, null_block_hash_count = dd.compute(
     unique_hashes, unique_tx, null_txid_count, null_block_hash_count)
 
 # Calculate the number of coinbase transactions
-coinbase_tx_count = df[df['is_coinbase']].shape[0].compute()
+coinbase_tx_count = transactions_df[transactions_df['is_coinbase']].shape[0].compute()
 
 # Print statistics including the coinbase transaction check
 print(f"\nTotal Number of Blocks: {unique_hashes}")
-print(f"Total Number of Transactions: {len(df)}")
+print(f"Total Number of Transactions: {len(transactions_df)}")
 print(f"Number of Unique Transactions: {unique_tx}")
 print(f"Number of Transactions with Missing txid: {null_txid_count}")
 print(f"Number of Transactions with Missing block_hash: {null_block_hash_count}")
@@ -37,14 +49,14 @@ else:
     print("Coinbase transaction count matches the number of blocks.")
 
 # Check for duplicates
-duplicates_count = df.group_by('txid').size()
+duplicates_count = transactions_df.group_by('txid').size()
 duplicates = duplicates_count[duplicates_count > 1].compute()
 if len(duplicates) > 0:
     print("\nSample of Duplicate Transactions:")
     print(duplicates.head())
 
 # Join transactions with blocks to test for block height continuity
-joined_df = df.merge(blocks_df, left_on='block_hash', right_on='block_hash', how='inner')
+joined_df = transactions_df.merge(blocks_df, left_on='block_hash', right_on='block_hash', how='inner')
 
 # Compute min and max block heights from joined DataFrame
 min_block_height = joined_df['height'].min().compute()

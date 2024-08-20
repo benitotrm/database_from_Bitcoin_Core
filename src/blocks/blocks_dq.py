@@ -11,8 +11,8 @@ if branch_name == 'main':
 else:
     ENV = 'dev'
 
-parquet_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{ENV}')
-blocks_df = dd.read_parquet(parquet_dir)
+blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{ENV}')
+blocks_df = dd.read_parquet(blocks_dir)
 
 def count_blocks():
     """Counts the number of blocks"""
