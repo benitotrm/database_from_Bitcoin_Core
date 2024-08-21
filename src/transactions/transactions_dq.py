@@ -13,7 +13,7 @@ blocks_df = dd.read_parquet(blocks_dir)
 
 transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{ENV}')
 transactions_df = dd.read_parquet(transactions_dir)
-transactions_df = transactions_df.repartition(npartitions=500)
+transactions_df = transactions_df.repartition(npartitions=2000)
 
 # Compute essential statistics
 unique_hashes = transactions_df['block_hash'].nunique()
