@@ -22,6 +22,7 @@ touch $LOCKFILE
 exec > >(tee -a $LOGFILE) 2>&1
 
 # Log the current branch before switching
+ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Current branch before switch: $(git rev-parse --abbrev-ref HEAD)"
 
 # Switch to main branch
@@ -39,20 +40,20 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)
 echo "Activating virtual environment..."
 source ~/Projects/database_from_Bitcoin_Core/venv/bin/activate
 
-# Run the populate_blocks script
+# Run the populate scripts
 echo "Running populate_blocks.py..."
 python -u src/blocks/populate_blocks.py
 
 # Run the data quality checks
 echo "Running blocks_dq.py..."
 python -u src/blocks/blocks_dq.py
+python -u src/transactions/transactions_dq.py
 
 # Deactivate the virtual environment
 echo "Deactivating virtual environment..."
 deactivate
 
 # Switch back to the original branch
-ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Switching back to original branch: $ORIGINAL_BRANCH"
 git checkout -
 
