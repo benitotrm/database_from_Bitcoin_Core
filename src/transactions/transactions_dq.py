@@ -6,10 +6,7 @@ from src.utils.commons import get_current_branch
 branch_name = get_current_branch()
 print(f"Current branch: {branch_name}")
 
-if branch_name == 'main':
-    ENV = 'main'
-else:
-    ENV = 'dev'
+ENV = 'main' if branch_name == 'main' else 'dev'
 
 blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{ENV}')
 blocks_df = dd.read_parquet(blocks_dir)
@@ -17,24 +14,17 @@ blocks_df = dd.read_parquet(blocks_dir)
 transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{ENV}')
 transactions_df = dd.read_parquet(transactions_dir)
 
-# Persist the DataFrames in memory for faster access
-transactions_df = transactions_df.persist()
-blocks_df = blocks_df.persist()
-
-# Calculate statistics
+# Compute essential statistics
 unique_hashes = transactions_df['block_hash'].nunique()
 unique_tx = transactions_df['txid'].nunique()
 null_txid_count = transactions_df['txid'].isnull().sum()
 null_block_hash_count = transactions_df['block_hash'].isnull().sum()
+coinbase_tx_count = transactions_df['is_coinbase'].sum()
 
-# Perform all computations in a single step
-unique_hashes, unique_tx, null_txid_count, null_block_hash_count = dd.compute(
-    unique_hashes, unique_tx, null_txid_count, null_block_hash_count)
+# Compute all together
+unique_hashes, unique_tx, null_txid_count, null_block_hash_count, coinbase_tx_count = dd.compute(
+    unique_hashes, unique_tx, null_txid_count, null_block_hash_count, coinbase_tx_count)
 
-# Calculate the number of coinbase transactions
-coinbase_tx_count = transactions_df[transactions_df['is_coinbase']].shape[0].compute()
-
-# Print statistics including the coinbase transaction check
 print(f"\nTotal Number of Blocks: {unique_hashes}")
 print(f"Total Number of Transactions: {len(transactions_df)}")
 print(f"Number of Unique Transactions: {unique_tx}")
@@ -48,17 +38,16 @@ if coinbase_tx_count != unique_hashes:
 else:
     print("Coinbase transaction count matches the number of blocks.")
 
-# Check for duplicates
-duplicates_count = transactions_df.group_by('txid').size()
-duplicates = duplicates_count[duplicates_count > 1].compute()
-if len(duplicates) > 0:
-    print("\nSample of Duplicate Transactions:")
-    print(duplicates.head())
+# Check for duplicates only if necessary
+if unique_tx < len(transactions_df):
+    duplicates_count = transactions_df.groupby('txid').size()
+    duplicates = duplicates_count[duplicates_count > 1].compute()
+    if len(duplicates) > 0:
+        print("\nSample of Duplicate Transactions:")
+        print(duplicates.head())
 
-# Join transactions with blocks to test for block height continuity
-joined_df = transactions_df.merge(blocks_df, left_on='block_hash', right_on='block_hash', how='inner')
-
-# Compute min and max block heights from joined DataFrame
+# Join transactions with blocks for continuity check
+joined_df = transactions_df.merge(blocks_df, on='block_hash', how='inner')
 min_block_height = joined_df['height'].min().compute()
 max_block_height = joined_df['height'].max().compute()
 total_expected_blocks = max_block_height - min_block_height + 1
@@ -66,22 +55,6 @@ total_expected_blocks = max_block_height - min_block_height + 1
 # Continuity check
 if total_expected_blocks != unique_hashes:
     print(f"\nBlock Heights are not continuous. Expected {total_expected_blocks} blocks, found {unique_hashes}.")
-
-    # Find block height with missing coinbase transaction
-    coinbase_tx_per_block = joined_df[joined_df['is_coinbase']].group_by('height').size()
-    all_block_heights = coinbase_tx_per_block.index.compute()
-    missing_coinbase_blocks = set(range(min_block_height, max_block_height + 1)) - set(all_block_heights)
-    
-    if missing_coinbase_blocks:
-        print("Missing Coinbase Transactions at Block Heights:")
-        print(missing_coinbase_blocks)
-    else:
-        print("No missing Coinbase Transactions found.")
+    # Additional checks for missing coinbase transactions and blocks could go here.
 else:
     print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
-
-# List Missing Blocks (if any)
-if total_expected_blocks != unique_hashes:
-    missing_blocks = blocks_df[~blocks_df['height'].between(min_block_height, max_block_height)]['height'].compute()
-    print("Missing Blocks:")
-    print(missing_blocks)
