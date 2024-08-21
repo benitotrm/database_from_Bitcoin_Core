@@ -13,6 +13,7 @@ blocks_df = dd.read_parquet(blocks_dir)
 
 transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{ENV}')
 transactions_df = dd.read_parquet(transactions_dir)
+transactions_df = transactions_df.repartition(npartitions=500)
 
 # Compute essential statistics
 unique_hashes = transactions_df['block_hash'].nunique()
@@ -58,3 +59,7 @@ if total_expected_blocks != unique_hashes:
     # Additional checks for missing coinbase transactions and blocks could go here.
 else:
     print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
+
+# Query the first few lines of the transactions DataFrame
+print("\nFirst few lines of the transactions DataFrame:")
+print(transactions_df.head().compute())
