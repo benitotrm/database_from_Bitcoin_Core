@@ -4,10 +4,11 @@ import json
 import argparse
 import requests
 import pandas as pd
-import dask.dataframe as dd
 import pyarrow as pa
+import dask.dataframe as dd
 from src.api.rpc_client import RPCClient
-from src.utils.commons import get_current_branch, get_max_block_height_on_file, consolidate_parquet_files, delete_unconsolidated_directory
+from src.utils.commons import (get_current_branch, get_max_block_height_on_file, 
+                               consolidate_parquet_files, delete_unconsolidated_directory)
 
 def setup_environment():
     """Set up the environment and print initial information."""
@@ -58,7 +59,7 @@ def get_latest_block_height(rpc_client):
 
 def process_blocks(start, end, env, rpc_client, blocks_schema):
     """Process and save block data in batches."""
-    batch_size = 1000
+    BATCH_SIZE = 1000
     input_directory = f"database/blocks_batches_{env}"
     output_directory = f"database/blocks_{env}"
     
@@ -79,7 +80,7 @@ def process_blocks(start, end, env, rpc_client, blocks_schema):
         if row:
             data.append(row)
 
-        if len(data) >= batch_size:
+        if len(data) >= BATCH_SIZE:
             save_batch(data, input_directory, blocks_schema)
             data = []
             print(f"Saved up to block {block_height}")
