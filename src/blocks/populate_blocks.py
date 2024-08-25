@@ -12,7 +12,7 @@ from src.utils.commons import (get_current_branch, get_max_block_height_on_file,
 
 def setup_environment():
     """Set up the environment and print initial information."""
-    print("\nRunning populate_blocks.py\n")
+    print("\npopulate_blocks.py started...\n")
     branch_name = get_current_branch()
     print(f"Current branch: {branch_name}")
     return 'main' if branch_name == 'main' else 'dev'
