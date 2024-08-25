@@ -51,9 +51,12 @@ python src/blocks_dq.py
 
 ## Automation workflow
 
-You can run these files manually or setup an automated workflow using cron that can run automatically or manually.
+You can run these files manually or setup an automated workflow using cron that can run automatically or manually. 
 
-Cron setup:
+For the cron job to work seamlessly I prefer to use SSH. I set the agent to start on each machine reboot so it's properly configured to update the agent, environment and key paths by adding this configuration on ~/.bashrc.
+
+Cron can be setup as follows:
+
 ```bash
 crontab -e
 ```
