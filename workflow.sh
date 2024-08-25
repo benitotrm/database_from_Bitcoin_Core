@@ -45,11 +45,11 @@ echo "Activating virtual environment..."
 source ~/Projects/database_from_Bitcoin_Core/venv/bin/activate
 
 # Run the populate scripts
-echo "Running populate_blocks.py..."
+echo "Running population scripts..."
 python -u src/blocks/populate_blocks.py
 
 # Run the data quality checks
-echo "Running blocks_dq.py..."
+echo "Running DQ scripts..."
 python -u src/blocks/blocks_dq.py
 python -u src/transactions/transactions_dq.py
 
