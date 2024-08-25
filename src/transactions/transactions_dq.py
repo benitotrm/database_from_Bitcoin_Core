@@ -5,7 +5,7 @@ from src.utils.commons import get_current_branch
 
 def setup_environment():
     """Set up the environment variables and directories."""
-    print("\nRunning transactions_dq.py\n")
+    print("\ntransactions_dq.py started...\n")
     branch_name = get_current_branch()
     print(f"Current branch: {branch_name}")
     env = 'main' if branch_name == 'main' else 'dev'
