@@ -23,15 +23,19 @@ exec > >(tee -a $LOGFILE) 2>&1
 
 # Log the current branch before switching
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-echo "Current branch before switch: $(git rev-parse --abbrev-ref HEAD)"
+echo "Current branch before switch: $ORIGINAL_BRANCH"
+
+# Stash any uncommitted changes
+echo "Stashing uncommitted changes..."
+git stash push -m "Auto stash before switching to main"
 
 # Switch to main branch
 echo "Switching to main branch..."
-git checkout main
+git checkout main || { echo "Failed to switch to main branch"; git stash pop; exit 1; }
 
 # Pull the latest changes from the repository
 echo "Running git pull..."
-git pull origin main
+git pull origin main || { echo "Failed to pull from main branch"; git checkout $ORIGINAL_BRANCH; git stash pop; exit 1; }
 
 # Set PYTHONPATH to include the project's root directory
 export PYTHONPATH=$PYTHONPATH:$(pwd)
@@ -55,7 +59,11 @@ deactivate
 
 # Switch back to the original branch
 echo "Switching back to original branch: $ORIGINAL_BRANCH"
-git checkout -
+git checkout $ORIGINAL_BRANCH || { echo "Failed to switch back to original branch"; git stash pop; exit 1; }
+
+# Apply stashed changes
+echo "Applying stashed changes..."
+git stash pop || { echo "No stashed changes to apply"; }
 
 # Remove the lock file after the job is done
 rm -f $LOCKFILE
