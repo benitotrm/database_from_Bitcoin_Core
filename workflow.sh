@@ -21,6 +21,10 @@ touch $LOCKFILE
 # Redirect stdout and stderr to the log file
 exec > >(tee -a $LOGFILE) 2>&1
 
+# Start the SSH agent
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+
 # Log the current branch before switching
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Current branch before switch: $ORIGINAL_BRANCH"
