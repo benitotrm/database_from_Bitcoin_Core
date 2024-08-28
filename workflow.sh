@@ -21,9 +21,6 @@ touch $LOCKFILE
 # Redirect stdout and stderr to the log file
 exec > >(tee -a $LOGFILE) 2>&1
 
-# Debug: Log the SSH_AUTH_SOCK environment variable
-echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> ~/cron_debug.log
-
 # Log the current branch before switching
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Current branch before switch: $ORIGINAL_BRANCH"
