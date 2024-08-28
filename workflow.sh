@@ -1,15 +1,5 @@
 #!/bin/bash
 
-# Source the SSH agent environment
-if [ -f ~/.ssh/ssh-agent.env ]; then
-    source ~/.ssh/ssh-agent.env
-    export SSH_AUTH_SOCK
-    export SSH_AGENT_PID
-    echo "Sourced SSH agent environment: SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> ~/cron_debug.log
-else
-    echo "No SSH agent environment found. SSH_AUTH_SOCK is not set." >> ~/cron_debug.log
-fi
-
 # Navigate to the repository directory
 cd ~/Projects/database_from_Bitcoin_Core
 
