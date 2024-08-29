@@ -62,9 +62,7 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
 
     blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{env}')
     blocks_df = dd.read_parquet(blocks_dir)
-
-    missing_blocks_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] < END_BLOCK)].compute()
-    
+  
     if os.path.exists(output_directory) and len(os.listdir(output_directory)) > 0:
         transactions_df = dd.read_parquet(output_directory)
         last_processed_height = transactions_df['height'].max().compute()
@@ -73,6 +71,8 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
         START_BLOCK = 0
 
     END_BLOCK = max_block_height_on_file
+
+    missing_blocks_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] < END_BLOCK)].compute()
 
     # Run the loop until we have processed all required blocks
     while START_BLOCK < END_BLOCK:
