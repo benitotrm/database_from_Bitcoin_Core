@@ -6,18 +6,6 @@ cd ~/Projects/database_from_Bitcoin_Core
 # Define log file location with timestamp
 LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_logs/workflow_$(date +"%Y%m%d_%H%M%S").log
 
-# Define lock file location
-LOCKFILE=/tmp/myjob.lock
-
-# Check if lock file exists
-if [ -e $LOCKFILE ]; then
-  echo "Job is already running. Exiting..." | tee -a $LOGFILE
-  exit 1
-fi
-
-# Create the lock file
-touch $LOCKFILE
-
 # Redirect stdout and stderr to the log file
 exec > >(tee -a $LOGFILE) 2>&1
 
@@ -64,9 +52,6 @@ git checkout $ORIGINAL_BRANCH || { echo "Failed to switch back to original branc
 # Apply stashed changes
 echo "Applying stashed changes..."
 git stash pop || { echo "No stashed changes to apply"; }
-
-# Remove the lock file after the job is done
-rm -f $LOCKFILE
 
 # Log the completion time
 echo "Workflow completed at $(date)"
