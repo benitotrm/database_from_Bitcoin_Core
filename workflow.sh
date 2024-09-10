@@ -56,4 +56,3 @@ git stash pop || { echo "No stashed changes to apply"; }
 
 # Log the completion time
 echo "Workflow completed at $(date)"
-
