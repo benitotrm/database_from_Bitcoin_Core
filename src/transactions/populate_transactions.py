@@ -26,30 +26,40 @@ def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch):
     """Fetch data for a specific block."""
     try:
         responses = rpc_client.rpc_call_batch("getblock", [{"blockhash": h, "verbosity": 2} for h in block_hashes_to_fetch])
+        
         if not responses:
             print(f"No response for block {block_height}")
             return []
-        
+
         transactions = []
-        for response in responses:
-            if response.get('error'):
-                print(f"Error in response for block hash {response.get('blockhash')}: {response['error']}")
+        for idx, response in enumerate(responses):
+            # Ensure the response is valid
+            if response is None:
+                print(f"Response {idx} is None. Skipping.")
                 continue
-            block_info = response.get('result', {})
+            
+            if not isinstance(response, dict) or 'result' not in response:
+                print(f"Invalid block response at index {idx}: {response}. Skipping.")
+                continue
+            
+            block_info = response['result']
+
+            # Process transactions within the block
             for tx in block_info.get('tx', []):
                 transactions.append({
                     'txid': tx.get('txid'),
                     'block_hash': block_info.get('hash'),
-                    'is_coinbase': 'coinbase' in tx.get('vin', [{}])[0]
+                    'is_coinbase': 'coinbase' in tx.get('vin', [{}])[0]  # Handle missing 'vin'
                 })
         return transactions
+
     except Exception as e:
         print(f"Error fetching transaction data for block {block_height}: {e}")
         return []
 
 def process_transactions(max_block_height_on_file, env, rpc_client, transactions_schema):
     BLOCK_INCREASE = 100
-    TRANSACTIONS_PER_BATCH = 100000
+    TRANSACTIONS_PER_BATCH = 10000
     BATCH_COUNT = 0
 
     input_directory = f"database/transaction_batches_{env}"
@@ -63,51 +73,54 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
     blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{env}')
     blocks_df = dd.read_parquet(blocks_dir)
 
-    missing_blocks_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] < END_BLOCK)].compute()
-    
+    # Determine START_BLOCK based on existing processed data
     if os.path.exists(output_directory) and len(os.listdir(output_directory)) > 0:
         transactions_df = dd.read_parquet(output_directory)
-        last_processed_height = transactions_df['height'].max().compute()
+        joined_df = transactions_df.merge(blocks_df[['block_hash', 'height']], on='block_hash', how='inner')
+        last_processed_height = joined_df['height'].max().compute()
         START_BLOCK = last_processed_height + 1 if last_processed_height is not None else 0
     else:
         START_BLOCK = 0
 
-    END_BLOCK = max_block_height_on_file
+    while START_BLOCK <= max_block_height_on_file:
+        END_BLOCK = min(START_BLOCK + BLOCK_INCREASE - 1, max_block_height_on_file)
 
-    # Run the loop until we have processed all required blocks
-    while START_BLOCK < END_BLOCK:
+        print(f"Processing blocks from {START_BLOCK} to {END_BLOCK}")
 
-        block_hashes_to_fetch = missing_blocks_df['block_hash'].to_list()
+        # Filter blocks for the current range
+        blocks_in_range_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] <= END_BLOCK)].compute()
+        block_hashes_to_fetch = blocks_in_range_df['block_hash'].tolist()
+
+        # Fetch the transaction data for the blocks
         transactions_data = fetch_transaction_data(START_BLOCK, rpc_client, block_hashes_to_fetch)
 
+        # 'transactions_data' contains the actual transactions, not block responses
         block_tx = []
-        for response in transactions_data:
-            if response is not None:
-                for tx in response['result']['tx']:
-                    is_coinbase_tx = 'coinbase' in tx['vin'][0] if tx['vin'] else False
-                    block_tx.append((tx['txid'], response['result']['hash'], is_coinbase_tx))
+        for idx, tx in enumerate(transactions_data):
+            # Each item is a transaction, not a block response
+            if not isinstance(tx, dict) or 'txid' not in tx:
+                print(f"Invalid transaction at index {idx}: {tx}. Skipping.")
+                continue
 
-                if len(block_tx) >= TRANSACTIONS_PER_BATCH:
-                    BATCH_COUNT += 1
-                    data = pd.DataFrame(block_tx[:TRANSACTIONS_PER_BATCH], columns=['txid', 'block_hash', 'is_coinbase'])
-                    save_batch(data, input_directory, transactions_schema)
+            block_tx.append(tx)  # Append the valid transaction to the list
 
-                    block_tx = block_tx[TRANSACTIONS_PER_BATCH:]
-                    current_height = missing_blocks_df['height'].max()
-                    print(f"Batch {BATCH_COUNT} processed successfully with block height up to {current_height}")
-            else:
-                print("Failed to process a batch of transactions")
+            # If we've reached the transaction batch size, save the batch
+            if len(block_tx) >= TRANSACTIONS_PER_BATCH:
+                BATCH_COUNT += 1
+                data = pd.DataFrame(block_tx[:TRANSACTIONS_PER_BATCH], columns=['txid', 'block_hash', 'is_coinbase'])
+                save_batch(data, input_directory, transactions_schema)
+                block_tx = block_tx[TRANSACTIONS_PER_BATCH:]  # Remove saved transactions
 
+        # Save any remaining transactions in the final batch
         if block_tx:
             BATCH_COUNT += 1
             data = pd.DataFrame(block_tx, columns=['txid', 'block_hash', 'is_coinbase'])
             save_batch(data, input_directory, transactions_schema)
-            current_height = missing_blocks_df['height'].max()
-            print(f"Final batch {BATCH_COUNT} processed with block height up to {current_height}")
 
-        START_BLOCK = current_height + 1 if current_height is not None else 0
-        END_BLOCK = min(START_BLOCK + BLOCK_INCREASE - 1, max_block_height_on_file)
+        # Increment START_BLOCK for the next iteration
+        START_BLOCK = END_BLOCK + 1
 
+    # Consolidate and clean up
     consolidate_parquet_files(input_directory, output_directory)
     delete_unconsolidated_directory(input_directory, output_directory)
 

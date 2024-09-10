@@ -35,6 +35,7 @@ source ~/Projects/database_from_Bitcoin_Core/venv/bin/activate
 # Run the populate scripts
 echo "Running population scripts..."
 python -u src/blocks/populate_blocks.py
+python -u src/transactions/populate_transactions.py
 
 # Run the data quality checks
 echo "Running DQ scripts..."
