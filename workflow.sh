@@ -4,7 +4,7 @@
 cd ~/Projects/database_from_Bitcoin_Core
 
 # Define log file location with timestamp
-LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_logs/workflow_$(date +"%Y%m%d_%H%M%S").log
+LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_logs/workflow.log
 
 # Redirect stdout and stderr to the log file
 exec > >(tee -a $LOGFILE) 2>&1
@@ -35,6 +35,7 @@ source ~/Projects/database_from_Bitcoin_Core/venv/bin/activate
 # Run the populate scripts
 echo "Running population scripts..."
 python -u src/blocks/populate_blocks.py
+python -u src/transactions/populate_transactions.py
 
 # Run the data quality checks
 echo "Running DQ scripts..."
@@ -56,7 +57,3 @@ git stash pop || { echo "No stashed changes to apply"; }
 # Log the completion time
 echo "Workflow completed at $(date)"
 
-# Commit the log file to main branch
-git add $LOGFILE
-git commit -m "Add workflow log for $(date +"%Y%m%d_%H%M%S")"
-git push origin main

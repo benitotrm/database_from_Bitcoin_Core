@@ -1,7 +1,13 @@
 '''Module to run a Data Quality check on the transactions parquets'''
 import os
+import pandas as pd
 import dask.dataframe as dd
 from src.utils.commons import get_current_branch
+
+# Set display options to avoid truncation
+pd.set_option('display.max_colwidth', None)  # Show full content in columns
+pd.set_option('display.max_rows', None)      # Display all rows without truncation
+pd.set_option('display.max_columns', None)   # Display all columns without truncation
 
 def setup_environment():
     """Set up the environment variables and directories."""
@@ -38,24 +44,38 @@ def check_coinbase_consistency(coinbase_tx_count, unique_hashes):
         print("Coinbase transaction count matches the number of blocks.")
 
 def check_duplicates(transactions_df):
-    """Check for duplicate transactions."""
-    def check_duplicates_partition(df):
-        return df.groupby('txid').size().loc[lambda x: x > 1]
+    """Check for duplicate transactions using value_counts across partitions."""
+    
+    # Get the count of 'txid' occurrences across partitions
+    txid_counts = transactions_df['txid'].value_counts().compute()
 
-    if transactions_df['txid'].nunique().compute() < len(transactions_df):
-        duplicates = transactions_df.map_partitions(check_duplicates_partition).compute()
-        if len(duplicates) > 0:
-            print("\nSample of Duplicate Transactions:")
-            print(duplicates.head())
+    # Find txids that occur more than once (duplicates)
+    duplicate_txids = txid_counts[txid_counts > 1].index
+
+    # Filter the DataFrame for these duplicate txids
+    duplicates_df = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
+
+    # If any duplicates are found, print the full details, including the block_hash
+    if not duplicates_df.empty:
+        print("\nSample of Duplicate Transactions with Block Hashes:")
+        pd.set_option('display.max_columns', None)  # Ensure full columns are displayed
+        pd.set_option('display.max_colwidth', None)  # Ensure full column width is displayed
+        print(duplicates_df[['txid', 'block_hash', 'is_coinbase']].drop_duplicates())
+    else:
+        print("\nNo duplicates found.")
 
 def check_block_continuity(joined_df, unique_hashes):
-    """Check if block heights are continuous."""
+    """Check if block heights are continuous and print missing blocks if any."""
     min_block_height = joined_df['height'].min().compute()
     max_block_height = joined_df['height'].max().compute()
+    expected_blocks = set(range(min_block_height, max_block_height + 1))
+    actual_blocks = set(joined_df['height'].unique().compute())
     total_expected_blocks = max_block_height - min_block_height + 1
+    missing_blocks = expected_blocks - actual_blocks
 
-    if total_expected_blocks != unique_hashes:
+    if total_expected_blocks != unique_hashes or missing_blocks:
         print(f"\nBlock Heights are not continuous. Expected {total_expected_blocks} blocks, found {unique_hashes}.")
+        print(f"Missing blocks: {sorted(missing_blocks)}")  
     else:
         print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
 
