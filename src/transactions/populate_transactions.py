@@ -58,7 +58,7 @@ def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch):
         return []
 
 def process_transactions(max_block_height_on_file, env, rpc_client, transactions_schema):
-    BLOCK_INCREASE = 100
+    BLOCK_INCREASE = 10
     TRANSACTIONS_PER_BATCH = 10000
     BATCH_COUNT = 0
 
