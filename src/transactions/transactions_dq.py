@@ -99,7 +99,7 @@ def main():
     check_duplicates(transactions_df)
 
     joined_df = transactions_df.merge(blocks_df, on='block_hash', how='inner')
-    check_block_continuity(joined_df, stats[0])
+    check_block_continuity(joined_df, total_number_of_blocks)
 
     print("\nFirst few lines of the transactions DataFrame:")
     print(transactions_df.head(10))
