@@ -1,5 +1,6 @@
 '''Module to populate the Transactions section of the database'''
 import os
+import argparse
 import pandas as pd
 import pyarrow as pa
 import dask.dataframe as dd
@@ -57,7 +58,7 @@ def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch):
         print(f"Error fetching transaction data for block {block_height}: {e}")
         return []
 
-def process_transactions(max_block_height_on_file, env, rpc_client, transactions_schema):
+def process_transactions(start_block, end_block, max_block_height_on_file, env, rpc_client, transactions_schema):
     BLOCK_INCREASE = 10
     TRANSACTIONS_PER_BATCH = 10000
     BATCH_COUNT = 0
@@ -73,8 +74,12 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
     blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{env}')
     blocks_df = dd.read_parquet(blocks_dir)
 
-    # Determine START_BLOCK based on existing processed data
-    if os.path.exists(output_directory) and len(os.listdir(output_directory)) > 0:
+    # Debug: Check if blocks_df is loaded correctly
+    print(f"Number of blocks available in blocks_df: {blocks_df.shape[0].compute()}")
+
+    if start_block is not None:
+        START_BLOCK = start_block
+    elif os.path.exists(output_directory) and len(os.listdir(output_directory)) > 0:
         transactions_df = dd.read_parquet(output_directory)
         joined_df = transactions_df.merge(blocks_df[['block_hash', 'height']], on='block_hash', how='inner')
         last_processed_height = joined_df['height'].max().compute()
@@ -82,13 +87,20 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
     else:
         START_BLOCK = 0
 
-    while START_BLOCK <= max_block_height_on_file:
-        END_BLOCK = min(START_BLOCK + BLOCK_INCREASE - 1, max_block_height_on_file)
+    END_BLOCK = end_block if end_block is not None else max_block_height_on_file
 
-        print(f"Processing blocks from {START_BLOCK} to {END_BLOCK}")
+    # Debug: Print START_BLOCK and END_BLOCK
+    print(f"Starting block height: {START_BLOCK}")
+    print(f"Ending block height: {END_BLOCK}")
+    print(f"Maximum block height on file: {max_block_height_on_file}")
+
+    while START_BLOCK <= END_BLOCK:
+        current_end_block = min(START_BLOCK + BLOCK_INCREASE - 1, END_BLOCK)
+
+        print(f"Processing blocks from {START_BLOCK} to {current_end_block}")
 
         # Filter blocks for the current range
-        blocks_in_range_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] <= END_BLOCK)].compute()
+        blocks_in_range_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] <= current_end_block)].compute()
         block_hashes_to_fetch = blocks_in_range_df['block_hash'].tolist()
 
         # Fetch the transaction data for the blocks
@@ -118,7 +130,7 @@ def process_transactions(max_block_height_on_file, env, rpc_client, transactions
             save_batch(data, input_directory, transactions_schema)
 
         # Increment START_BLOCK for the next iteration
-        START_BLOCK = END_BLOCK + 1
+        START_BLOCK = current_end_block + 1
 
     # Consolidate and clean up
     consolidate_parquet_files(input_directory, output_directory)
@@ -131,12 +143,21 @@ def save_batch(data, directory, schema):
 
 def main():
     """Main function to run the transaction population process."""
+    # Argument parsing
+    parser = argparse.ArgumentParser(description="Process transactions from blocks.")
+    parser.add_argument('--start', type=int, help='The starting block height', required=False)
+    parser.add_argument('--end', type=int, help='The ending block height', required=False)
+    
+    args = parser.parse_args()
+
     env = setup_environment()
     transactions_schema = define_schema()
     rpc_client = RPCClient()
 
-    max_block_height_on_file = get_max_block_height_on_file(env=env)    
-    process_transactions(max_block_height_on_file, env, rpc_client, transactions_schema)
+    max_block_height_on_file = get_max_block_height_on_file(env=env)
+
+    # Pass the start and end block arguments to process_transactions
+    process_transactions(args.start, args.end, max_block_height_on_file, env, rpc_client, transactions_schema)
 
 if __name__ == "__main__":
     main()

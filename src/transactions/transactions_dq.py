@@ -47,20 +47,20 @@ def check_duplicates(transactions_df):
     """Check for duplicate transactions using value_counts across partitions."""
     
     # Get the count of 'txid' occurrences across partitions
-    txid_counts = transactions_df['txid'].value_counts().compute()
+    txid_counts = transactions_df['txid'].value_counts()
 
     # Find txids that occur more than once (duplicates)
     duplicate_txids = txid_counts[txid_counts > 1].index
 
-    # Filter the DataFrame for these duplicate txids
-    duplicates_df = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
+    # Use a Dask DataFrame to filter for duplicates without computing the entire DataFrame
+    duplicates_df = transactions_df[transactions_df['txid'].isin(duplicate_txids)]
 
-    # If any duplicates are found, print the full details, including the block_hash
-    if not duplicates_df.empty:
+    # Compute and print the sample of duplicates if any are found
+    if not duplicates_df.is_empty().compute():
         print("\nSample of Duplicate Transactions with Block Hashes:")
         pd.set_option('display.max_columns', None)  # Ensure full columns are displayed
         pd.set_option('display.max_colwidth', None)  # Ensure full column width is displayed
-        print(duplicates_df[['txid', 'block_hash', 'is_coinbase']].drop_duplicates())
+        print(duplicates_df[['txid', 'block_hash', 'is_coinbase']].drop_duplicates().compute())
     else:
         print("\nNo duplicates found.")
 
@@ -92,7 +92,9 @@ def main():
     print(f"Number of Transactions with Missing block_hash: {stats[3]}")
     print(f"Number of Coinbase Transactions: {stats[4]}")
 
-    check_coinbase_consistency(stats[4], stats[0])
+    number_of_coinbase_transactions = stats[4]
+    total_number_of_blocks = stats[0]
+    check_coinbase_consistency(number_of_coinbase_transactions, total_number_of_blocks)
 
     check_duplicates(transactions_df)
 
@@ -104,3 +106,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
