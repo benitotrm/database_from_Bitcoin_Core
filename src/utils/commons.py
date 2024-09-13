@@ -40,42 +40,40 @@ def consolidate_parquet_files(input_directory, output_directory):
 
     # Load existing legacy data from the consolidated directory if it exists
     if os.path.exists(output_directory) and os.listdir(output_directory):
-        existing_df = dd.read_parquet(f'{output_directory}/*.parquet')
+        existing_df = dd.read_parquet(f'{output_directory}/*.parquet', index=False)
     else:
         existing_df = None
 
     # Load new Parquet files
     try:
-        new_df = dd.read_parquet(f'{input_directory}/*.parquet')
+        new_df = dd.read_parquet(f'{input_directory}/*.parquet', index=False)
     except FileNotFoundError:
         print(f"No new Parquet files found in {input_directory}. Proceeding with existing data.")
         new_df = dd.from_pandas(pd.DataFrame(), npartitions=1)
 
     # Combine existing and new data
     if existing_df is not None:
-        combined_df = dd.concat([existing_df, new_df])
+        combined_df = dd.concat([existing_df, new_df], interleave_partitions=True)
     else:
         combined_df = new_df
 
+    # Reset index to ensure proper partitioning
+    combined_df = combined_df.reset_index(drop=True)
+
     # If the combined dataframe is empty, return without doing anything
-    if combined_df.isnull().all().all().compute():
+    if combined_df.shape[0].compute() == 0:
         print("No data to consolidate.")
         return
 
-    # Calculate number of partitions based on a target partition size of 1GB
-    partition_size = 1e9 
-    current_size = combined_df.memory_usage(deep=True).sum().compute()
-    npartitions = max(1, int(current_size / partition_size))
-
-    # Repartition the dataframe
-    combined_df = combined_df.repartition(npartitions=npartitions)
+    # Repartition the dataframe to have partitions of approximately 2GB
+    combined_df = combined_df.repartition(partition_size="2GB")
 
     # Write the combined data back to the consolidated output directory
-    combined_df.to_parquet(temp_output_directory)
+    combined_df.to_parquet(temp_output_directory, write_metadata_file=False)
 
     # Replace the old output directory with the new data
-    shutil.rmtree(output_directory)  # Remove the old directory
-    shutil.move(temp_output_directory, output_directory)  # Move temp directory to the target location
+    shutil.rmtree(output_directory)
+    shutil.move(temp_output_directory, output_directory)
 
     print(f"Consolidated Parquet files written to {output_directory}")
 
