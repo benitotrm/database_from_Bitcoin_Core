@@ -1,8 +1,11 @@
 '''Module to run a Data Quality check on the transactions parquets'''
 import os
+import dask
 import pandas as pd
 import dask.dataframe as dd
 from src.utils.commons import get_current_branch
+
+print("Dask version:", dask.__version__)
 
 # Set display options to avoid truncation
 pd.set_option('display.max_colwidth', None)  # Show full content in columns
@@ -23,7 +26,6 @@ def load_data(blocks_dir, transactions_dir):
     """Load and prepare the dataframes."""
     blocks_df = dd.read_parquet(blocks_dir)
     transactions_df = dd.read_parquet(transactions_dir)
-    transactions_df = transactions_df.repartition(npartitions=500)
     return blocks_df, transactions_df
 
 def compute_statistics(transactions_df):
@@ -44,23 +46,28 @@ def check_coinbase_consistency(coinbase_tx_count, unique_hashes):
         print("Coinbase transaction count matches the number of blocks.")
 
 def check_duplicates(transactions_df):
-    """Check for duplicate transactions using value_counts across partitions."""
-    
-    # Get the count of 'txid' occurrences across partitions
-    txid_counts = transactions_df['txid'].value_counts().compute()
+    """Check for duplicate transactions by repartitioning and checking within partitions."""
 
-    # Find txids that occur more than once (duplicates)
-    duplicate_txids = txid_counts[txid_counts > 1].index
+    # Repartition the DataFrame by 'txid' so that all identical 'txid's are in the same partition
+    transactions_df = transactions_df.set_index('txid', drop=False, sorted=False, shuffle='disk')
 
-    # Filter the DataFrame for these duplicate txids
-    duplicates_df = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
+    # Define a function to find duplicates within each partition
+    def find_partition_duplicates(df):
+        duplicate_rows = df[df.duplicated(subset=['txid'], keep=False)]
+        return duplicate_rows
 
-    # If any duplicates are found, print the full details, including the block_hash
-    if not duplicates_df.empty:
-        print("\nSample of Duplicate Transactions with Block Hashes:")
-        pd.set_option('display.max_columns', None)  # Ensure full columns are displayed
-        pd.set_option('display.max_colwidth', None)  # Ensure full column width is displayed
-        print(duplicates_df[['txid', 'block_hash', 'is_coinbase']].drop_duplicates())
+    # Apply the function to each partition
+    duplicates_df = transactions_df.map_partitions(find_partition_duplicates)
+
+    # Compute the number of duplicates
+    num_duplicates = duplicates_df.shape[0].compute()
+
+    # Check if duplicates exist and print them
+    if num_duplicates > 0:
+        print(f"\nFound {num_duplicates} duplicate transactions:")
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.max_colwidth', None)
+        print(duplicates_df[['txid', 'block_hash', 'is_coinbase']].drop_duplicates().compute())
     else:
         print("\nNo duplicates found.")
 
@@ -104,3 +111,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

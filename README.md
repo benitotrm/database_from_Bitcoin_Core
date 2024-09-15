@@ -33,7 +33,9 @@ python -m unittest discover
 The following commands execute the complete population of each dataset:
 
 ```bash
-python src/populate_blocks.py 
+python src/blocks/populate_blocks.py
+python src/transactions/populate_transactions.py
+...
 ```
 Same commands with an example use of their optional parameters:
 
@@ -46,7 +48,9 @@ python src/populate_blocks.py --start 10000 --end 20000
 The following are the commands execut the relevant Data Quality checks of each dataset:
 
 ```bash
-python src/blocks_dq.py 
+python src/blocks/blocks_dq.py
+python src/transactions/transacitions_dq.py 
+...
 ```
 
 ## Automation workflow
@@ -60,12 +64,12 @@ Cron can be setup as follows:
 ```bash
 crontab -e
 ```
-Line to add to the cron.log:
+Line to add to cron for a scheduled midnight run:
 ```bash
-0 0 * * * ~/Projects/database_from_Bitcoin_Core/run_workflow.sh >> ~/Projects/database_from_Bitcoin_Core/cron.log 2>&1
+0 0 * * * ~/Projects/database_from_Bitcoin_Core/workflow.sh
 ```
 
 Example manual run:
 ```bash
-~/Projects/database_from_Bitcoin_Core/run_workflow.sh
+~/Projects/database_from_Bitcoin_Core/workflow.sh
 ```
