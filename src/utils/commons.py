@@ -1,10 +1,9 @@
 '''Common functions used across modules.'''
 import os
+import glob
 import errno
 import shutil
-import tempfile
 import subprocess
-import pandas as pd
 import dask.dataframe as dd
 
 def get_current_branch():
@@ -32,50 +31,68 @@ def get_max_block_height_on_file(env):
                 return existing_blocks_df['height'].max().compute()
     return None
 
-def consolidate_parquet_files(input_directory, output_directory):
-    """Consolidates small parquet files into larger files of approximately 1GB"""
+def consolidate_parquet_files(input_directory, output_directory, target_partition_size="1GB", batch_size=1000, reprocess=False):
+    '''Consolidates Parquet files in the input directory into the output directory'''
+    # Ensure output_directory exists
+    os.makedirs(output_directory, exist_ok=True)
     
-    # Create a temporary directory for writing consolidated files
-    temp_output_directory = tempfile.mkdtemp()
+    # Get list of new Parquet files
+    new_parquet_files = glob.glob(os.path.join(input_directory, '*.parquet'))
+    new_parquet_files.sort()
+    
+    # Get existing Parquet files
+    existing_parquet_files = glob.glob(os.path.join(output_directory, '*.parquet'))
+    existing_parquet_files.sort()
 
-    # Load existing legacy data from the consolidated directory if it exists
-    if os.path.exists(output_directory) and os.listdir(output_directory):
-        existing_df = dd.read_parquet(f'{output_directory}/*.parquet', index=False)
+    # Determine the starting point for numbering
+    if existing_parquet_files:
+        last_file = existing_parquet_files[-1]
+        last_number = int(last_file.split('.')[-2])  # Extract the file number
+        file_counter = last_number + 1
     else:
-        existing_df = None
+        file_counter = 0
+    
+    # If reprocessing, include existing files and adjust batch size
+    if reprocess:
+        new_parquet_files = existing_parquet_files + new_parquet_files
+        batch_size = 10  # Set smaller batch size for reprocessing
+        file_counter = 0  # Start numbering from scratch when reprocessing
 
-    # Load new Parquet files
-    try:
-        new_df = dd.read_parquet(f'{input_directory}/*.parquet', index=False)
-    except FileNotFoundError:
-        print(f"No new Parquet files found in {input_directory}. Proceeding with existing data.")
-        new_df = dd.from_pandas(pd.DataFrame(), npartitions=1)
+    # Process files in batches
+    total_files = len(new_parquet_files)
+    num_batches = (total_files + batch_size - 1) // batch_size
 
-    # Combine existing and new data
-    if existing_df is not None:
-        combined_df = dd.concat([existing_df, new_df], interleave_partitions=True)
-    else:
-        combined_df = new_df
+    for batch_num in range(num_batches):
+        batch_start = batch_num * batch_size
+        batch_end = min((batch_num + 1) * batch_size, total_files)
+        batch_files = new_parquet_files[batch_start:batch_end]
+        
+        print(f"Processing batch {batch_num + 1}/{num_batches} with files {batch_start} to {batch_end - 1}")
+        
+        # Read batch of files
+        ddf = dd.read_parquet(batch_files, engine='pyarrow', ignore_divisions=True)
+        
+        # Repartition to desired partition size
+        ddf = ddf.repartition(partition_size=target_partition_size)
+        
+        # Define name function to continue numbering from existing files
+        def name_function(i):
+            return f"part.{file_counter + i}.parquet"
+        
+        # Write the batch to Parquet
+        ddf.to_parquet(
+            output_directory,
+            name_function=name_function,
+            write_index=False,
+            append=True,
+            overwrite=False,
+            engine='pyarrow'
+        )
+        
+        # Update file counter
+        file_counter += ddf.npartitions
 
-    # Reset index to ensure proper partitioning
-    combined_df = combined_df.reset_index(drop=True)
-
-    # If the combined dataframe is empty, return without doing anything
-    if combined_df.shape[0].compute() == 0:
-        print("No data to consolidate.")
-        return
-
-    # Repartition the dataframe to have partitions of approximately 2GB
-    combined_df = combined_df.repartition(partition_size="2GB")
-
-    # Write the combined data back to the consolidated output directory
-    combined_df.to_parquet(temp_output_directory, write_metadata_file=False)
-
-    # Replace the old output directory with the new data
-    shutil.rmtree(output_directory)
-    shutil.move(temp_output_directory, output_directory)
-
-    print(f"Consolidated Parquet files written to {output_directory}")
+    print(f"Consolidation complete. New files written to {output_directory}")
 
 def delete_unconsolidated_directory(input_directory, consolidated_output_directory):
     """Deletes the entire input directory if the consolidation was successful"""
