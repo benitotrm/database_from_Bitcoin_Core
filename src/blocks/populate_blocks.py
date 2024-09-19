@@ -1,6 +1,7 @@
 """Module to populate the Blocks section of the database"""
 import os
 import json
+import dask
 import argparse
 import requests
 import pandas as pd
@@ -9,6 +10,13 @@ import dask.dataframe as dd
 from src.api.rpc_client import RPCClient
 from src.utils.commons import (get_current_branch, get_max_block_height_on_file, 
                                consolidate_parquet_files, delete_unconsolidated_directory)
+
+print("Dask version:", dask.__version__)
+
+# Set display options to avoid truncation
+pd.set_option('display.max_colwidth', None)  # Show full content in columns
+pd.set_option('display.max_rows', None)      # Display all rows without truncation
+pd.set_option('display.max_columns', None)   # Display all columns without truncation
 
 def setup_environment():
     """Set up the environment and print initial information."""
@@ -20,10 +28,10 @@ def setup_environment():
 def define_schema():
     """Define and return the schema for blocks data."""
     return pa.schema([
+        ('height', pa.int32()),  # Unique index
         ('block_hash', pa.string()),
-        ('height', pa.int64()),
         ('time', pa.int64()),
-        ('tx_count', pa.int64())
+        ('tx_count', pa.int32())
     ])
 
 def fetch_block_data(block_height, rpc_client):
@@ -36,8 +44,8 @@ def fetch_block_data(block_height, rpc_client):
 
         block_stats = response['result']
         return {
-            'block_hash': block_stats['blockhash'],
             'height': block_height,
+            'block_hash': block_stats['blockhash'],
             'time': block_stats['time'],
             'tx_count': block_stats['txs']
         }
@@ -88,13 +96,24 @@ def process_blocks(start, end, env, rpc_client, blocks_schema):
     if data:
         save_batch(data, input_directory, blocks_schema)
 
-    consolidate_parquet_files(input_directory, output_directory)
+    consolidate_parquet_files(input_directory, output_directory, write_index=True)
     delete_unconsolidated_directory(input_directory, output_directory)
 
 def save_batch(data, directory, schema):
-    """Save a batch of data to a parquet file."""
-    ddf = dd.from_pandas(pd.DataFrame(data), npartitions=1)
-    ddf.to_parquet(directory, append=True, schema=schema, write_index=False)
+    """Save a batch of data to a parquet file, using block_hash as the index."""
+    # Convert to Dask DataFrame and ensure proper types
+    df = pd.DataFrame(data)
+    df['height'] = df['height'].astype('int32')
+    df['tx_count'] = df['tx_count'].astype('int32')
+    df['time'] = df['time'].astype('int64')  # Keep time as int64
+    
+    ddf = dd.from_pandas(df, npartitions=1)
+    
+    # Set block_hash as the index
+    ddf = ddf.set_index('height', sorted=True)
+    
+    # Save the data to Parquet, ensuring the index is written
+    ddf.to_parquet(directory, append=True, schema=schema, write_index=True)
 
 def main():
     """Main function to run the block population process."""

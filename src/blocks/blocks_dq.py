@@ -1,7 +1,16 @@
 """Module to run a Data Quality check on the block.parquets"""
 import os
+import dask
+import pandas as pd
 import dask.dataframe as dd
 from src.utils.commons import get_current_branch
+
+print("Dask version:", dask.__version__)
+
+# Set display options to avoid truncation
+pd.set_option('display.max_colwidth', None)  # Show full content in columns
+pd.set_option('display.max_rows', None)      # Display all rows without truncation
+pd.set_option('display.max_columns', None)   # Display all columns without truncation
 
 def setup_environment():
     """Set up the environment and print initial information."""
@@ -35,14 +44,15 @@ def test_blocks_table(blocks_df):
     """Run a series of tests to ensure data integrity."""
     all_passed = True
     
-    # Test for consecutive height
-    sorted_blocks = blocks_df.sort_values('height')
-    heights = sorted_blocks['height'].compute()
-    if not heights.is_monotonic_increasing or (heights.diff().fillna(0).max() > 1):
+    # No need to set the index, just access the current index
+    heights = blocks_df.index.compute()
+
+    # Test if the heights are consecutive
+    if not heights.is_monotonic_increasing or (heights.to_series().diff().fillna(0).max() > 1):
         print("Block height not consecutive.")
         all_passed = False
 
-    # Test for non-empty hash, time, and tx_count
+    # Test for non-empty block_hash, time, and tx_count
     required_columns = ['block_hash', 'time', 'tx_count']
     missing_columns = [col for col in required_columns if col not in blocks_df.columns]
     if missing_columns:
@@ -68,7 +78,7 @@ def test_blocks_table(blocks_df):
 
 def query_blocks(blocks_df):
     """Generate and print a sample of the block data."""
-    print(blocks_df.head(10))
+    print(blocks_df.tail(10))
 
 def main():
     """Main function to run all data quality checks."""
