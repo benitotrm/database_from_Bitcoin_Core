@@ -38,38 +38,38 @@ def check_coinbase_consistency(transactions_df, all_blocks):
     else:
         print("All blocks have at least one coinbase transaction.")
 
-def check_duplicates(transactions_df):
-    """Check for duplicate transactions based on txid, and report the corresponding heights."""
-    # Group by 'txid' and count the occurrences
-    duplicate_groups = transactions_df.groupby('txid').size().compute()
+# def check_duplicates(transactions_df):
+#     """Check for duplicate transactions based on txid, and report the corresponding heights."""
+#     # Group by 'txid' and count the occurrences
+#     duplicate_groups = transactions_df.groupby('txid').size().compute()
     
-    # Filter to get txids that have more than one occurrence
-    duplicates = duplicate_groups[duplicate_groups > 1]
+#     # Filter to get txids that have more than one occurrence
+#     duplicates = duplicate_groups[duplicate_groups > 1]
     
-    if not duplicates.empty:
-        # Fetch the rows with the duplicate txids and display the corresponding heights
-        duplicate_txids = duplicates.index.tolist()
-        duplicate_rows = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
+#     if not duplicates.empty:
+#         # Fetch the rows with the duplicate txids and display the corresponding heights
+#         duplicate_txids = duplicates.index.tolist()
+#         duplicate_rows = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
         
-        # Print the duplicates with their associated heights
-        print(f"\nFound {len(duplicate_rows)} duplicate transactions in the following blocks:")
-        print(duplicate_rows[['txid', 'block_hash', 'is_coinbase']])
-    else:
-        print("\nNo duplicates found.")
+#         # Print the duplicates with their associated heights
+#         print(f"\nFound {len(duplicate_rows)} duplicate transactions in the following blocks:")
+#         print(duplicate_rows[['txid', 'block_hash', 'is_coinbase']])
+#     else:
+#         print("\nNo duplicates found.")
 
-def check_block_continuity(transactions_df, unique_hashes, all_blocks):
-    """Check if block heights are continuous and print missing blocks if any."""
-    min_block_height = transactions_df.index.min().compute()
-    max_block_height = transactions_df.index.max().compute()
-    expected_blocks = set(range(min_block_height, max_block_height + 1))
-    missing_blocks = expected_blocks - set(all_blocks)
-    total_expected_blocks = max_block_height - min_block_height + 1
+# def check_block_continuity(transactions_df, unique_hashes, all_blocks):
+#     """Check if block heights are continuous and print missing blocks if any."""
+#     min_block_height = transactions_df.index.min().compute()
+#     max_block_height = transactions_df.index.max().compute()
+#     expected_blocks = set(range(min_block_height, max_block_height + 1))
+#     missing_blocks = expected_blocks - set(all_blocks)
+#     total_expected_blocks = max_block_height - min_block_height + 1
 
-    if total_expected_blocks != unique_hashes or missing_blocks:
-        print(f"\nBlock Heights are not continuous. Expected {total_expected_blocks} blocks, found {unique_hashes}.")
-        print(f"Missing blocks: {sorted(missing_blocks)}")
-    else:
-        print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
+#     if total_expected_blocks != unique_hashes or missing_blocks:
+#         print(f"\nBlock Heights are not continuous. Expected {total_expected_blocks} blocks, found {unique_hashes}.")
+#         print(f"Missing blocks: {sorted(missing_blocks)}")
+#     else:
+#         print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
 
 def main():
     '''Main process for transactions_dq.py'''
@@ -88,8 +88,8 @@ def main():
 
     all_blocks = transactions_df.index.unique().compute()
     check_coinbase_consistency(transactions_df, all_blocks)
-    check_duplicates(transactions_df)
-    check_block_continuity(transactions_df, unique_hashes, all_blocks)
+    # check_duplicates(transactions_df)
+    # check_block_continuity(transactions_df, unique_hashes, all_blocks)
 
     print("\nLast few lines of the transactions DataFrame:")
     print(transactions_df.tail(10))

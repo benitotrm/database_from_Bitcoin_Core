@@ -76,8 +76,8 @@ def consolidate_parquet_files(input_directory, output_directory, target_partitio
         ddf.to_parquet(
             output_directory,
             write_index=write_index,  # Write index if it's enabled
-            append=not reprocess,  # Append if not reprocessing, otherwise overwrite
-            overwrite=reprocess,  # Overwrite if reprocessing
+            append=True, 
+            overwrite=False,  
             engine='pyarrow'
         )
         
