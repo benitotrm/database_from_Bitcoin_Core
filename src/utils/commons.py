@@ -17,22 +17,24 @@ def get_current_branch():
         return 'unknown'
 
 def get_max_block_height_on_file(env):
-    """Returns the maximum block height available in the existing Parquet files"""
+    """Returns the maximum block height available in the existing Parquet files."""
     blocks_directory = f'database/blocks_{env}'
     if os.path.exists(blocks_directory):
         parquet_files = [
             os.path.join(blocks_directory, f)
             for f in os.listdir(blocks_directory)
             if f.endswith(".parquet")
-            ]
+        ]
         if parquet_files:
             existing_blocks_df = dd.read_parquet(parquet_files)
+            
+            # Access the index (height) instead of treating it as a column
             if existing_blocks_df.shape[0].compute() > 0:
-                return existing_blocks_df['height'].max().compute()
+                return existing_blocks_df.index.max().compute()  # Use index.max() instead of ['height'].max()
     return None
 
-def consolidate_parquet_files(input_directory, output_directory, target_partition_size="1GB", batch_size=1000, reprocess=False):
-    '''Consolidates Parquet files in the input directory into the output directory'''
+def consolidate_parquet_files(input_directory, output_directory, target_partition_size="1GB", batch_size=1000, reprocess=False, write_index=False):
+    """Consolidates new Parquet files into larger partitions and appends to existing data, overwriting if reprocess=True."""
     # Ensure output_directory exists
     os.makedirs(output_directory, exist_ok=True)
     
@@ -44,19 +46,13 @@ def consolidate_parquet_files(input_directory, output_directory, target_partitio
     existing_parquet_files = glob.glob(os.path.join(output_directory, '*.parquet'))
     existing_parquet_files.sort()
 
-    # Determine the starting point for numbering
-    if existing_parquet_files:
-        last_file = existing_parquet_files[-1]
-        last_number = int(last_file.split('.')[-2])  # Extract the file number
-        file_counter = last_number + 1
-    else:
-        file_counter = 0
-    
+    # Determine the starting point for numbering (not needed anymore if we let Dask handle it)
+    file_counter = 0
+
     # If reprocessing, include existing files and adjust batch size
     if reprocess:
         new_parquet_files = existing_parquet_files + new_parquet_files
         batch_size = 10  # Set smaller batch size for reprocessing
-        file_counter = 0  # Start numbering from scratch when reprocessing
 
     # Process files in batches
     total_files = len(new_parquet_files)
@@ -70,26 +66,22 @@ def consolidate_parquet_files(input_directory, output_directory, target_partitio
         print(f"Processing batch {batch_num + 1}/{num_batches} with files {batch_start} to {batch_end - 1}")
         
         # Read batch of files
-        ddf = dd.read_parquet(batch_files, engine='pyarrow', ignore_divisions=True)
+        ddf = dd.read_parquet(batch_files, engine='pyarrow', ignore_divisions=False)
         
-        # Repartition to desired partition size
+        # Ensure that repartitioning happens to the desired target size
+        print(f"Repartitioning to target size {target_partition_size}")
         ddf = ddf.repartition(partition_size=target_partition_size)
         
-        # Define name function to continue numbering from existing files
-        def name_function(i):
-            return f"part.{file_counter + i}.parquet"
-        
-        # Write the batch to Parquet
+        # Write the batch to Parquet, without manually setting the name_function
         ddf.to_parquet(
             output_directory,
-            name_function=name_function,
-            write_index=False,
-            append=True,
-            overwrite=False,
+            write_index=write_index,  # Write index if it's enabled
+            append=True, 
+            overwrite=False,  
             engine='pyarrow'
         )
         
-        # Update file counter
+        # Increment the file_counter (not strictly needed with automatic naming)
         file_counter += ddf.npartitions
 
     print(f"Consolidation complete. New files written to {output_directory}")

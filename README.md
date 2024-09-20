@@ -1,6 +1,19 @@
 # database_from_Bitcoin_Core
 
-This guide is focused on Linux, but all steps should be replicable on Windows.
+This project is focused on extracting Bitcoin blockchain data from Bitcoin Core via its RPC API using a Python ETL process, which stores the data in Parquet files. The schema for the database is as follows:
+
+| **Schema**        | **Field**     | **Type**  | **Description**                 | **Index**      |
+|-------------------|---------------|-----------|---------------------------------|----------------|
+| **Blocks**        | `height`      | `int32`   | Height of the block             | Unique         |
+|                   | `block_hash`  | `string`  | Hash of the block               |                |
+|                   | `time`        | `int64`   | Timestamp of the block (Unix)   |                |
+|                   | `tx_count`    | `int32`   | Number of transactions in block |                |
+|-------------------|---------------|-----------|---------------------------------|----------------|
+| **Transactions**  | `height`      | `int32`   | Block height                    | Non-Unique     |
+|                   | `block_hash`  | `string`  | Hash of the related block       |                |
+|                   | `txid`        | `string`  | Transaction ID                  |                |
+|                   | `is_coinbase` | `bool_`   | Is the transaction a coinbase?  |                |
+|-------------------|---------------|-----------|---------------------------------|----------------|
 
 ## Bitcoin Core setup
 
@@ -53,9 +66,9 @@ python src/transactions/transacitions_dq.py
 ...
 ```
 
-## Automation workflow
+## Workflow automation
 
-You can run these files manually or setup an automated workflow using cron that can run automatically or manually. 
+You can run these files manually or setup an automated workflow using cron (on linux) that can run automatically or manually. 
 
 For the cron job to work seamlessly I prefer to use SSH. I set the agent to start on each machine reboot so it's properly configured to update the agent, environment and key paths by adding this configuration on ~/.bashrc.
 

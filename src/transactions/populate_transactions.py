@@ -18,12 +18,13 @@ def setup_environment():
 def define_schema():
     """Define and return the schema for blocks data."""
     return pa.schema([
-        ('txid', pa.string()),
+        ('height', pa.int32()),  # Non-unique index
         ('block_hash', pa.string()),
+        ('txid', pa.string()),
         ('is_coinbase', pa.bool_())
     ])
 
-def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch):
+def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch, block_heights):
     """Fetch data for a specific block."""
     try:
         responses = rpc_client.rpc_call_batch("getblock", [{"blockhash": h, "verbosity": 2} for h in block_hashes_to_fetch])
@@ -44,13 +45,15 @@ def fetch_transaction_data(block_height, rpc_client, block_hashes_to_fetch):
                 continue
             
             block_info = response['result']
+            block_height = block_heights[idx]  # Get the corresponding block height
 
             # Process transactions within the block
             for tx in block_info.get('tx', []):
                 transactions.append({
                     'txid': tx.get('txid'),
                     'block_hash': block_info.get('hash'),
-                    'is_coinbase': 'coinbase' in tx.get('vin', [{}])[0]  # Handle missing 'vin'
+                    'is_coinbase': 'coinbase' in tx.get('vin', [{}])[0],  # Handle missing 'vin'
+                    'height': block_height  # Add the block height
                 })
         return transactions
 
@@ -72,7 +75,7 @@ def process_transactions(start_block, end_block, max_block_height_on_file, env, 
         os.makedirs(output_directory)
 
     blocks_dir = os.path.join(os.path.dirname(__file__), f'../../database/blocks_{env}')
-    blocks_df = dd.read_parquet(blocks_dir)
+    blocks_df = dd.read_parquet(blocks_dir).persist()
 
     # Debug: Check if blocks_df is loaded correctly
     print(f"Number of blocks available in blocks_df: {blocks_df.shape[0].compute()}")
@@ -80,9 +83,9 @@ def process_transactions(start_block, end_block, max_block_height_on_file, env, 
     if start_block is not None:
         START_BLOCK = start_block
     elif os.path.exists(output_directory) and len(os.listdir(output_directory)) > 0:
-        transactions_df = dd.read_parquet(output_directory)
-        joined_df = transactions_df.merge(blocks_df[['block_hash', 'height']], on='block_hash', how='inner')
-        last_processed_height = joined_df['height'].max().compute()
+        transactions_df = dd.read_parquet(output_directory, index='height')
+        last_processed_height = transactions_df.index.max().compute()
+        print(f"Last processed height: {last_processed_height}")
         START_BLOCK = last_processed_height + 1 if last_processed_height is not None else 0
     else:
         START_BLOCK = 0
@@ -99,12 +102,13 @@ def process_transactions(start_block, end_block, max_block_height_on_file, env, 
 
         print(f"Processing blocks from {START_BLOCK} to {current_end_block}")
 
-        # Filter blocks for the current range
-        blocks_in_range_df = blocks_df[(blocks_df["height"] >= START_BLOCK) & (blocks_df["height"] <= current_end_block)].compute()
+        # Filter blocks for the current range using the index
+        blocks_in_range_df = blocks_df.loc[START_BLOCK:current_end_block].compute()
         block_hashes_to_fetch = blocks_in_range_df['block_hash'].tolist()
+        block_heights = blocks_in_range_df.index.tolist()  # Get the corresponding block heights
 
         # Fetch the transaction data for the blocks
-        transactions_data = fetch_transaction_data(START_BLOCK, rpc_client, block_hashes_to_fetch)
+        transactions_data = fetch_transaction_data(START_BLOCK, rpc_client, block_hashes_to_fetch, block_heights)
 
         # 'transactions_data' contains the actual transactions, not block responses
         block_tx = []
@@ -119,27 +123,36 @@ def process_transactions(start_block, end_block, max_block_height_on_file, env, 
             # If we've reached the transaction batch size, save the batch
             if len(block_tx) >= TRANSACTIONS_PER_BATCH:
                 BATCH_COUNT += 1
-                data = pd.DataFrame(block_tx[:TRANSACTIONS_PER_BATCH], columns=['txid', 'block_hash', 'is_coinbase'])
+                data = pd.DataFrame(block_tx[:TRANSACTIONS_PER_BATCH], columns=['txid', 'block_hash', 'is_coinbase', 'height'])
                 save_batch(data, input_directory, transactions_schema)
                 block_tx = block_tx[TRANSACTIONS_PER_BATCH:]  # Remove saved transactions
 
         # Save any remaining transactions in the final batch
         if block_tx:
             BATCH_COUNT += 1
-            data = pd.DataFrame(block_tx, columns=['txid', 'block_hash', 'is_coinbase'])
+            data = pd.DataFrame(block_tx, columns=['txid', 'block_hash', 'is_coinbase', 'height'])
             save_batch(data, input_directory, transactions_schema)
 
         # Increment START_BLOCK for the next iteration
         START_BLOCK = current_end_block + 1
 
     # Consolidate and clean up
-    consolidate_parquet_files(input_directory, output_directory)
+    consolidate_parquet_files(input_directory, output_directory, write_index=True)
     delete_unconsolidated_directory(input_directory, output_directory)
 
 def save_batch(data, directory, schema):
     """Save a batch of data to a parquet file."""
-    ddf = dd.from_pandas(pd.DataFrame(data), npartitions=1)
-    ddf.to_parquet(directory, append=True, schema=schema, write_index=False)
+    # Convert to Dask DataFrame and ensure proper types
+    df = pd.DataFrame(data)
+    df['height'] = df['height'].astype('int32')  # Force int32 for height
+
+    ddf = dd.from_pandas(df, npartitions=1)
+    
+    # Set height as the index
+    ddf = ddf.set_index('height', sorted=True)
+    
+    # Save the data to Parquet, ensuring the index is written
+    ddf.to_parquet(directory, append=True, schema=schema, write_index=True, ignore_divisions=True)
 
 def main():
     """Main function to run the transaction population process."""
