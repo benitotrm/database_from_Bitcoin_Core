@@ -13,9 +13,13 @@ exec > >(tee -a $LOGFILE) 2>&1
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Current branch before switch: $ORIGINAL_BRANCH"
 
-# Stash any uncommitted changes
-echo "Stashing uncommitted changes..."
-git stash push -m "Auto stash before switching to main"
+# Check for uncommitted changes before stashing
+if ! git diff-index --quiet HEAD --; then
+    echo "Stashing uncommitted changes..."
+    git stash push -m "Auto stash before switching to main"
+else
+    echo "No local changes to save"
+fi
 
 # Switch to main branch
 echo "Switching to main branch..."
@@ -50,9 +54,13 @@ deactivate
 echo "Switching back to original branch: $ORIGINAL_BRANCH"
 git checkout $ORIGINAL_BRANCH || { echo "Failed to switch back to original branch"; git stash pop; exit 1; }
 
-# Apply stashed changes
-echo "Applying stashed changes..."
-git stash pop || { echo "No stashed changes to apply"; }
+# Apply stashed changes if any were stashed
+if git stash list | grep -q "Auto stash before switching to main"; then
+    echo "Applying stashed changes..."
+    git stash pop || { echo "Failed to apply stashed changes"; exit 1; }
+else
+    echo "No stashed changes to apply"
+fi
 
 # Log the completion time
 echo "Workflow completed at $(date)"
