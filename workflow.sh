@@ -7,7 +7,7 @@ cd ~/Projects/database_from_Bitcoin_Core
 LOGFILE=~/Projects/database_from_Bitcoin_Core/workflow_logs/workflow.log
 
 # Redirect stdout and stderr to the log file
-exec > >(tee -a $LOGFILE) 2>&1
+exec > >(tee $LOGFILE) 2>&1
 
 # Log the current branch before switching
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
