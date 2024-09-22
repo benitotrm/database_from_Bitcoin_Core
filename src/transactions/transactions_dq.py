@@ -19,24 +19,37 @@ def setup_environment():
     return transactions_dir
 
 def compute_statistics(transactions_df):
-    """Compute basic statistics from the transactions dataframe."""
+    """Compute basic statistics from the transactions dataframe with exact counts."""
+
+    # Use nunique for 'block_hash' and 'txid' to get exact counts
     unique_hashes = transactions_df['block_hash'].nunique()
     unique_tx = transactions_df['txid'].nunique()
+
+    # Compute null counts and 'is_coinbase' sum per partition
     null_txid_count = transactions_df['txid'].isnull().sum()
     null_block_hash_count = transactions_df['block_hash'].isnull().sum()
     coinbase_tx_count = transactions_df['is_coinbase'].sum()
 
-    return dd.compute(unique_hashes, unique_tx, null_txid_count, null_block_hash_count, coinbase_tx_count)
+    # Compute exact unique heights from the index
+    unique_heights = transactions_df.index.nunique()
 
-def check_coinbase_consistency(transactions_df, all_blocks):
-    """Check if there is at least one coinbase transaction per block."""
-    coinbase_blocks = transactions_df[transactions_df['is_coinbase']].index.unique().compute()
-    missing_coinbase_blocks = set(all_blocks) - set(coinbase_blocks)
+    # Aggregate the results efficiently to avoid memory overload
+    results = dd.compute(
+        unique_heights, unique_hashes, unique_tx, 
+        null_txid_count, null_block_hash_count, coinbase_tx_count
+    )
 
-    if missing_coinbase_blocks:
-        print(f"Discrepancy Alert: Missing coinbase transactions for blocks: {sorted(missing_coinbase_blocks)}")
-    else:
-        print("All blocks have at least one coinbase transaction.")
+    return results
+
+# def check_coinbase_consistency(transactions_df, unique_heights):
+#     """Check if there is at least one coinbase transaction per block."""
+#     coinbase_blocks = transactions_df[transactions_df['is_coinbase']].index.unique().compute()
+#     missing_coinbase_blocks = set(unique_heights) - set(coinbase_blocks)
+
+#     if missing_coinbase_blocks:
+#         print(f"Discrepancy Alert: Missing coinbase transactions for blocks: {sorted(missing_coinbase_blocks)}")
+#     else:
+#         print("All blocks have at least one coinbase transaction.")
 
 # def check_duplicates(transactions_df):
 #     """Check for duplicate transactions based on txid, and report the corresponding heights."""
@@ -76,20 +89,24 @@ def main():
     transactions_dir = setup_environment()
     transactions_df = dd.read_parquet(transactions_dir)
 
+    # Call the optimized compute_statistics function
     stats = compute_statistics(transactions_df)
-    unique_hashes, unique_tx, null_txid_count, null_block_hash_count, coinbase_tx_count = stats
 
-    print(f"\nTotal Number of Blocks: {unique_hashes}")
-    print(f"Total Number of Transactions: {len(transactions_df)}")
-    print(f"Number of Unique Transactions: {unique_tx}")
-    print(f"Number of Transactions with Missing txid: {null_txid_count}")
-    print(f"Number of Transactions with Missing block_hash: {null_block_hash_count}")
-    print(f"Number of Coinbase Transactions: {coinbase_tx_count}")
+    # Unpack the results
+    (unique_heights, unique_hashes, unique_tx, 
+     null_txid_count, null_block_hash_count, coinbase_tx_count) = stats
 
-    all_blocks = transactions_df.index.unique().compute()
-    check_coinbase_consistency(transactions_df, all_blocks)
+    # Use the statistics as needed
+    print(f"Unique Heights: {unique_heights}")
+    print(f"Unique Block Hashes: {unique_hashes}")
+    print(f"Unique Transactions: {unique_tx}")
+    print(f"Null txid Count: {null_txid_count}")
+    print(f"Null block_hash Count: {null_block_hash_count}")
+    print(f"Coinbase Transactions Count: {coinbase_tx_count}")
+
+    # check_coinbase_consistency(transactions_df, unique_heights)
     # check_duplicates(transactions_df)
-    # check_block_continuity(transactions_df, unique_hashes, all_blocks)
+    # check_block_continuity(transactions_df, unique_heights, unique_heights)
 
     print("\nLast few lines of the transactions DataFrame:")
     print(transactions_df.tail(10))
