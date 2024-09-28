@@ -1,7 +1,9 @@
 '''Module to run a Data Quality check on the transactions parquets'''
 import os
 import pandas as pd
+import dask.config
 import dask.dataframe as dd
+from dask.distributed import Client
 from src.utils.commons import get_current_branch
 
 # Display options for debugging
@@ -41,75 +43,53 @@ def compute_statistics(transactions_df):
 
     return results
 
-# def check_coinbase_consistency(transactions_df, unique_heights):
-#     """Check if there is at least one coinbase transaction per block."""
-#     coinbase_blocks = transactions_df[transactions_df['is_coinbase']].index.unique().compute()
-#     missing_coinbase_blocks = set(unique_heights) - set(coinbase_blocks)
-
-#     if missing_coinbase_blocks:
-#         print(f"Discrepancy Alert: Missing coinbase transactions for blocks: {sorted(missing_coinbase_blocks)}")
-#     else:
-#         print("All blocks have at least one coinbase transaction.")
-
-# def check_duplicates(transactions_df):
-#     """Check for duplicate transactions based on txid, and report the corresponding heights."""
-#     # Group by 'txid' and count the occurrences
-#     duplicate_groups = transactions_df.groupby('txid').size().compute()
+def check_duplicates(txid_series):
+    """Check for duplicate txids and report the corresponding blocks."""
     
-#     # Filter to get txids that have more than one occurrence
-#     duplicates = duplicate_groups[duplicate_groups > 1]
-    
-#     if not duplicates.empty:
-#         # Fetch the rows with the duplicate txids and display the corresponding heights
-#         duplicate_txids = duplicates.index.tolist()
-#         duplicate_rows = transactions_df[transactions_df['txid'].isin(duplicate_txids)].compute()
-        
-#         # Print the duplicates with their associated heights
-#         print(f"\nFound {len(duplicate_rows)} duplicate transactions in the following blocks:")
-#         print(duplicate_rows[['txid', 'block_hash', 'is_coinbase']])
-#     else:
-#         print("\nNo duplicates found.")
+    # Group by 'height' (index) and 'txid' (column)
+    grouped = txid_series.groupby(['height', 'txid']).size().compute()
 
-# def check_block_continuity(transactions_df, unique_hashes, all_blocks):
-#     """Check if block heights are continuous and print missing blocks if any."""
-#     min_block_height = transactions_df.index.min().compute()
-#     max_block_height = transactions_df.index.max().compute()
-#     expected_blocks = set(range(min_block_height, max_block_height + 1))
-#     missing_blocks = expected_blocks - set(all_blocks)
-#     total_expected_blocks = max_block_height - min_block_height + 1
+    # Filter to only include txids that appear more than once within the same height
+    duplicates = grouped[grouped > 1].reset_index()
 
-#     if total_expected_blocks != unique_hashes or missing_blocks:
-#         print(f"\nBlock Heights are not continuous. Expected {total_expected_blocks} blocks, found {unique_hashes}.")
-#         print(f"Missing blocks: {sorted(missing_blocks)}")
-#     else:
-#         print(f"\nBlock Heights are continuous from {min_block_height} to {max_block_height}.")
+    num_duplicates = len(duplicates)
+    if num_duplicates > 0:
+        print(f"\nFound {num_duplicates} duplicate txids in the dataset.")
+        # Fetch a small sample of duplicates to display
+        sample_duplicates = duplicates[['height', 'txid']].head(10)
+        print("Sample of duplicate transactions:")
+        print(sample_duplicates)
+    else:
+        print("\nNo duplicates found.")
 
 def main():
     '''Main process for transactions_dq.py'''
-    transactions_dir = setup_environment()
-    transactions_df = dd.read_parquet(transactions_dir)
+    Client()
+    with dask.config.set({'dataframe.shuffle.method': 'tasks'}):
+        transactions_dir = setup_environment()
+        transactions_df = dd.read_parquet(transactions_dir)
+        transactions_df = transactions_df.repartition(npartitions=1000)
+        
+        # Call the optimized compute_statistics function
+        stats = compute_statistics(transactions_df)
 
-    # Call the optimized compute_statistics function
-    stats = compute_statistics(transactions_df)
+        # Unpack the results
+        (unique_heights, unique_hashes, unique_tx, 
+         null_txid_count, null_block_hash_count, coinbase_tx_count) = stats
 
-    # Unpack the results
-    (unique_heights, unique_hashes, unique_tx, 
-     null_txid_count, null_block_hash_count, coinbase_tx_count) = stats
+        # Use the statistics as needed
+        print(f"Unique Heights: {unique_heights}")
+        print(f"Unique Block Hashes: {unique_hashes}")
+        print(f"Unique Transactions: {unique_tx}")
+        print(f"Null txid Count: {null_txid_count}")
+        print(f"Null block_hash Count: {null_block_hash_count}")
+        print(f"Coinbase Transactions Count: {coinbase_tx_count}")
 
-    # Use the statistics as needed
-    print(f"Unique Heights: {unique_heights}")
-    print(f"Unique Block Hashes: {unique_hashes}")
-    print(f"Unique Transactions: {unique_tx}")
-    print(f"Null txid Count: {null_txid_count}")
-    print(f"Null block_hash Count: {null_block_hash_count}")
-    print(f"Coinbase Transactions Count: {coinbase_tx_count}")
+        # txid_series = transactions_df[['txid']]
+        # check_duplicates(txid_series)
 
-    # check_coinbase_consistency(transactions_df, unique_heights)
-    # check_duplicates(transactions_df)
-    # check_block_continuity(transactions_df, unique_heights, unique_heights)
-
-    print("\nLast few lines of the transactions DataFrame:")
-    print(transactions_df.tail(10))
+        print("\nLast few lines of the transactions DataFrame:")
+        print(transactions_df.tail(10))
 
 if __name__ == "__main__":
     main()

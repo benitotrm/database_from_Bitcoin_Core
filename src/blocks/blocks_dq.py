@@ -5,8 +5,6 @@ import pandas as pd
 import dask.dataframe as dd
 from src.utils.commons import get_current_branch
 
-print("Dask version:", dask.__version__)
-
 # Set display options to avoid truncation
 pd.set_option('display.max_colwidth', None)  # Show full content in columns
 pd.set_option('display.max_rows', None)      # Display all rows without truncation
@@ -84,6 +82,7 @@ def main():
     """Main function to run all data quality checks."""
     env = setup_environment()
     blocks_df = load_data(env)
+    print(blocks_df.divisions)
     
     count_blocks(blocks_df)
     check_for_duplicate_blocks(blocks_df)
