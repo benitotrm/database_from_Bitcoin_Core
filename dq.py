@@ -1,25 +1,3 @@
-#%% ###################### VIN DQ ######################
-###################### VIN DQ ######################
-# Load DataFrames
-vin_df = dd.read_parquet('_vin_parquets/*.parquet', columns=['vin_txid'])
-transactions_df = dd.read_parquet('_transactions_parquets/*.parquet', columns=['txid', 'is_coinbase'])
-
-# Remove duplicates in vin_df
-vin_df = vin_df.drop_duplicates()
-
-# Merge and filter DataFrames
-merged_df = vin_df.merge(transactions_df, left_on='vin_txid', right_on='txid', how='left', indicator=True)
-non_matching_df = merged_df[(merged_df['_merge'] == 'left_only') & (merged_df['is_coinbase'] != True)]
-
-# Check if there are any non-matching records
-has_non_matching_records = da.any(non_matching_df['vin_txid'].notnull()).compute()
-
-# Output result
-if not has_non_matching_records:
-    print("All vin_txid values are either matched with txid or are coinbase transactions. Data is consistent.")
-else:
-    print("There are unmatched non-coinbase vin_txid. Further investigation needed.")
-
 #%% ###################### VOUT DQ ######################
 ###################### VOUT DQ ######################
 pd.set_option('display.max_colwidth', 0)

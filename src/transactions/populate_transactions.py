@@ -105,7 +105,7 @@ def process_transactions(start_block, end_block, max_block_height_on_file, env, 
         # Filter blocks for the current range using the index
         blocks_in_range_df = blocks_df.loc[START_BLOCK:current_end_block].compute()
         block_hashes_to_fetch = blocks_in_range_df['block_hash'].tolist()
-        block_heights = blocks_in_range_df.index.tolist()  # Get the corresponding block heights
+        block_heights = blocks_in_range_df.index.tolist()
 
         # Fetch the transaction data for the blocks
         transactions_data = fetch_transaction_data(START_BLOCK, rpc_client, block_hashes_to_fetch, block_heights)

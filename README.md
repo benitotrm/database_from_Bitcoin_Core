@@ -8,12 +8,10 @@ This project is focused on extracting Bitcoin blockchain data from Bitcoin Core 
 |                   | `block_hash`  | `string`  | Hash of the block               |                |
 |                   | `time`        | `int64`   | Timestamp of the block (Unix)   |                |
 |                   | `tx_count`    | `int32`   | Number of transactions in block |                |
-|-------------------|---------------|-----------|---------------------------------|----------------|
 | **Transactions**  | `height`      | `int32`   | Block height                    | Non-Unique     |
 |                   | `block_hash`  | `string`  | Hash of the related block       |                |
 |                   | `txid`        | `string`  | Transaction ID                  |                |
 |                   | `is_coinbase` | `bool_`   | Is the transaction a coinbase?  |                |
-|-------------------|---------------|-----------|---------------------------------|----------------|
 
 ## Bitcoin Core setup
 

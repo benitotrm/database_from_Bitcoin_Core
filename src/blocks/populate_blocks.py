@@ -101,18 +101,13 @@ def process_blocks(start, end, env, rpc_client, blocks_schema):
 
 def save_batch(data, directory, schema):
     """Save a batch of data to a parquet file, using block_hash as the index."""
-    # Convert to Dask DataFrame and ensure proper types
     df = pd.DataFrame(data)
     df['height'] = df['height'].astype('int32')
     df['tx_count'] = df['tx_count'].astype('int32')
-    df['time'] = df['time'].astype('int64')  # Keep time as int64
+    df['time'] = df['time'].astype('int64')
     
     ddf = dd.from_pandas(df, npartitions=1)
-    
-    # Set block_hash as the index
     ddf = ddf.set_index('height', sorted=True)
-    
-    # Save the data to Parquet, ensuring the index is written
     ddf.to_parquet(directory, append=True, schema=schema, write_index=True)
 
 def main():
