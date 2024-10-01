@@ -20,10 +20,10 @@ def define_schema():
         ('height', pa.int32()),  # Non-unique index
         ('txid', pa.string()),
         ('vin_txid', pa.string()),
-        ('vout', pa.string())
+        ('vout', pa.int32())
     ])
 
-def fetch_vins_data(rpc_client, transactions_to_fetch):
+def fetch_vins_data(rpc_client, transactions_to_fetch, height):
     """Fetch data for a specific transaction."""
     vin_data = rpc_client.rpc_call_batch("getrawtransaction", [{"txid": txid, "verbose": 1} for txid in transactions_to_fetch])
 
@@ -34,9 +34,9 @@ def fetch_vins_data(rpc_client, transactions_to_fetch):
             for vin in response['result']['vin']:
                 if 'txid' in vin:
                     vin_txid = vin['txid']
-                    vout = vin['vout']
-                    vin_rows.append((txid, vin_txid, vout))
-    return pd.DataFrame(vin_rows, columns=['txid', 'vin_txid', 'vout'])
+                    vout = int(vin['vout'])
+                    vin_rows.append((height, txid, vin_txid, vout))
+    return pd.DataFrame(vin_rows, columns=['height', 'txid', 'vin_txid', 'vout'])
 
 def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_client, vins_schema):
     # Constants for batch processing
@@ -53,7 +53,7 @@ def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_clie
         os.makedirs(output_directory)
 
     transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{env}')
-    transactions_df = dd.read_parquet(transactions_dir, columns=['txid', 'is_coinbase'])
+    transactions_df = dd.read_parquet(transactions_dir, columns=['txid', 'is_coinbase']).persist()
 
     if start_block is not None:
         START_BLOCK = start_block
@@ -78,24 +78,23 @@ def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_clie
         print(f"Processing blocks from {START_BLOCK} to {current_end_block}")
 
         # Filter blocks for the current range
-        blocks_in_range_df = transactions_df.loc[START_BLOCK:current_end_block]
+        blocks_in_range_df = transactions_df.query(f'{START_BLOCK} <= index <= {current_end_block}')
         transactions_to_fetch = blocks_in_range_df[(blocks_in_range_df['is_coinbase'] == False)]['txid'].drop_duplicates().compute().tolist()
+        print(f"Transactions to fetch: {len(transactions_to_fetch)} transactions")
 
         # Process the transactions in batches
         for i in range(0, len(transactions_to_fetch), BATCH_SIZE):
             batch_transactions = transactions_to_fetch[i:i + BATCH_SIZE]
 
-            # VIN data extraction
-            vin_df = fetch_vins_data(rpc_client, batch_transactions)
-
-            # Perform final compute here
-            vin_df_computed = vin_df.compute()
-            if not vin_df_computed.empty:
-                data = pd.DataFrame(vin_df_computed, columns=['txid', 'vin_txid', 'vout'], index=vin_df_computed.index)
-                save_batch(data, input_directory, vins_schema)
+            # VIN data extraction and batch save
+            vin_df = fetch_vins_data(rpc_client, batch_transactions, START_BLOCK)
+            if not vin_df.empty:
+                save_batch(vin_df, input_directory, vins_schema)
                 vin_batch_count += 1
             print(f"Processed batch {vin_batch_count} (Transactions {i} to {i + BATCH_SIZE})")
-    
+
+        START_BLOCK = current_end_block + 1
+
     # Consolidate and clean up
     consolidate_parquet_files(input_directory, output_directory, write_index=True)
     delete_unconsolidated_directory(input_directory, output_directory)
@@ -104,6 +103,7 @@ def save_batch(data, directory, schema):
     """Save a batch of data to a parquet file."""
     df = pd.DataFrame(data)
     df['height'] = df['height'].astype('int32')
+    df['vout'] = df['vout'].astype('int32')
     ddf = dd.from_pandas(df, npartitions=1)
     ddf = ddf.set_index('height', sorted=True)
     ddf.to_parquet(directory, append=True, schema=schema, write_index=True, ignore_divisions=True)

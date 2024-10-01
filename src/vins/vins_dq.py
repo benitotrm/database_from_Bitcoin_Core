@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import dask.array as da
 import dask.dataframe as dd
-from dask.distributed import Client
 from src.utils.commons import get_current_branch
 
 # Display options for debugging
@@ -23,7 +22,7 @@ def setup_environment():
 
 def check_non_matching_vins(vins_df, transactions_df):
     '''Check if there are any non-matching records in the vins_df'''
-    vins_df = vins_df.drop_duplicates()
+    vins_df = vins_df['vin_txid'].drop_duplicates()
 
     # Merge and filter DataFrames
     merged_df = vins_df.merge(transactions_df, left_on='vin_txid', right_on='txid', how='left', indicator=True)
@@ -38,12 +37,12 @@ def check_non_matching_vins(vins_df, transactions_df):
         print("There are unmatched non-coinbase vin_txid. Further investigation needed.")
 
 def main():
-    '''Main process for transactions_dq.py'''
-    Client()
+    '''Main process for vins_dq.py'''
     vins_dir, transactions_dir = setup_environment()
-    vins_df = dd.read_parquet(vins_dir, columns=['vin_txid'])
+    vins_df = dd.read_parquet(vins_dir)
     transactions_df = dd.read_parquet(transactions_dir, columns=['txid', 'is_coinbase'])
     check_non_matching_vins(vins_df, transactions_df)
+    print(vins_df.tail(10))
 
 if __name__ == "__main__":
     main()
