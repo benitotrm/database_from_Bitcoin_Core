@@ -12,6 +12,9 @@ This project is focused on extracting Bitcoin blockchain data from Bitcoin Core 
 |                   | `block_hash`  | `string`  | Hash of the related block       |                |
 |                   | `txid`        | `string`  | Transaction ID                  |                |
 |                   | `is_coinbase` | `bool_`   | Is the transaction a coinbase?  |                |
+| **Vins**          | `txid`        | `string`  | Transaction ID                  |                |
+|                   | `vin_txid`    | `string`  | Input transactions IDs          |                |
+|                   | `vout`        | `int32`   | Output transaction identifier   |                |
 
 ## Bitcoin Core setup
 

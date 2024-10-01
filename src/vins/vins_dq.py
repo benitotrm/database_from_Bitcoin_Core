@@ -25,7 +25,7 @@ def check_non_matching_vins(vins_df, transactions_df):
     vins_df = vins_df['vin_txid'].drop_duplicates()
 
     # Merge and filter DataFrames
-    merged_df = vins_df.merge(transactions_df, left_on='vin_txid', right_on='txid', how='left', indicator=True)
+    merged_df = vins_df.to_frame().merge(transactions_df, left_on='vin_txid', right_on='txid', how='left', indicator=True)
     non_matching_df = merged_df[(merged_df['_merge'] == 'left_only') & (merged_df['is_coinbase'] != True)]
 
     # Check if there are any non-matching records
