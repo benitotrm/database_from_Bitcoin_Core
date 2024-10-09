@@ -70,7 +70,7 @@ def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_clie
     # Fetch all non-coinbase transactions from the relevant blocks
     query_string = f"({START_BLOCK} <= index <= {END_BLOCK}) and (is_coinbase == False)"
     transactions_df_filtered = transactions_df.query(query_string)
-    transactions_df_filtered = transactions_df_filtered.reset_index()
+    transactions_df_filtered = transactions_df_filtered.reset_index().sort_values('height')
     transactions_to_fetch = transactions_df_filtered[['txid', 'height']].compute().values.tolist()
     print(f"Total transactions to fetch: {len(transactions_to_fetch)}")
 
