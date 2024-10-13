@@ -92,7 +92,7 @@ def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_clie
         print(f"Processed batch {vin_batch_count}, heights {min_height} to {max_height}")
 
     # Consolidate and clean up
-    consolidate_parquet_files(input_directory, output_directory, write_index=True)
+    consolidate_parquet_files(input_directory, output_directory, target_partition_size='2GB', write_index=True)
     delete_unconsolidated_directory(input_directory, output_directory)
 
 def save_batch(data, directory, schema):
