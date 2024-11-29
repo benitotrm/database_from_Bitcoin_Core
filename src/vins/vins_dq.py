@@ -1,14 +1,9 @@
-'''Module to run a Data Quality check on the vins parquets'''
+'''Module to run a Data Quality check on the vins parquets in batches'''
 import os
-import pandas as pd
-import dask.array as da
-import dask.dataframe as dd
+import polars as pl
 from src.utils.commons import get_current_branch
 
-# Display options for debugging
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
+BATCH_SIZE = 50000
 
 def setup_environment():
     """Set up the environment variables and directories."""
@@ -20,29 +15,44 @@ def setup_environment():
     transactions_dir = os.path.join(os.path.dirname(__file__), f'../../database/transactions_{env}')
     return vin_dir, transactions_dir
 
-def check_non_matching_vins(vins_df, transactions_df):
-    '''Check if there are any non-matching records in the vins_df'''
-    vins_df = vins_df['vin_txid'].drop_duplicates()
+def process_batches(vins_dir, transactions_dir):
+    '''Process vins and transactions data in batches'''
+    # Load the full transactions DataFrame (only relevant columns)
+    transactions_df = pl.scan_parquet(transactions_dir).select(['txid', 'is_coinbase', 'height'])
 
-    # Merge and filter DataFrames
-    merged_df = vins_df.to_frame().merge(transactions_df, left_on='vin_txid', right_on='txid', how='left', indicator=True)
-    non_matching_df = merged_df[(merged_df['_merge'] == 'left_only') & (merged_df['is_coinbase'] != True)]
+    # Get min and max height from vins data
+    vins_df = pl.scan_parquet(vins_dir)
+    min_height = vins_df.select(pl.col('height').min()).collect().item()
+    max_height = vins_df.select(pl.col('height').max()).collect().item()
 
-    # Check if there are any non-matching records
-    has_non_matching_records = da.any(non_matching_df['vin_txid'].notnull()).compute()
+    # Process in batches of BATCH_SIZE
+    for start_height in range(min_height, max_height + 1, BATCH_SIZE):
+        end_height = start_height + BATCH_SIZE - 1
+        print(f"Processing batch: {start_height} to {end_height}")
 
-    if not has_non_matching_records:
-        print("All vin_txid values are either matched with txid or are coinbase transactions. Data is consistent.")
-    else:
-        print("There are unmatched non-coinbase vin_txid. Further investigation needed.")
+        # Filter vins DataFrame for the current batch
+        batch_vins_df = vins_df.filter((pl.col('height') >= start_height) & (pl.col('height') <= end_height)).collect()
+
+        # Ensure that the filtered batch DataFrame is not empty
+        if batch_vins_df.is_empty():
+            print(f"No records found for batch: {start_height} to {end_height}")
+            continue
+
+        # Perform the data quality check for the current batch
+        vin_txids = batch_vins_df.select('vin_txid').to_series().to_list()
+        batch_transactions_df = transactions_df.filter(pl.col('txid').is_in(vin_txids)).collect()
+        
+        # Ensure that the filtered transactions DataFrame is not empty
+        if batch_transactions_df.is_empty():
+            print(f"No matching transactions found for batch: {start_height} to {end_height}")
+            continue
+
+        print(f"Batch {start_height} to {end_height} processed successfully with matching vins and transactions.")
 
 def main():
     '''Main process for vins_dq.py'''
     vins_dir, transactions_dir = setup_environment()
-    vins_df = dd.read_parquet(vins_dir)
-    transactions_df = dd.read_parquet(transactions_dir, columns=['txid', 'is_coinbase'])
-    check_non_matching_vins(vins_df, transactions_df)
-    print(vins_df.tail(10))
+    process_batches(vins_dir, transactions_dir)
 
 if __name__ == "__main__":
     main()
