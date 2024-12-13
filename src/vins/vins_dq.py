@@ -3,7 +3,7 @@ import os
 import polars as pl
 from src.utils.commons import get_current_branch
 
-BATCH_SIZE = 50000
+BATCH_SIZE = 10000
 
 def setup_environment():
     """Set up the environment variables and directories."""
