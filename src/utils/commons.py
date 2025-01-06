@@ -33,7 +33,7 @@ def get_max_block_height_on_file(env):
                 return existing_blocks_df.index.max().compute()  # Use index.max() instead of ['height'].max()
     return None
 
-def consolidate_parquet_files(input_directory, output_directory, target_partition_size="1GB", batch_size=1000, reprocess=False, write_index=False):
+def consolidate_parquet_files(input_directory, output_directory, target_partition_size="1GB", batch_size=300, reprocess=False, write_index=False):
     """Consolidates new Parquet files into larger partitions and appends to existing data, overwriting if reprocess=True."""
     # Ensure output_directory exists
     os.makedirs(output_directory, exist_ok=True)
