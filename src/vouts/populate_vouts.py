@@ -14,14 +14,14 @@ def setup_environment():
 
 def fetch_vouts_data(rpc_client, transactions_with_height):
     """Fetch data for a specific transaction along with height."""
-    print(f"Fetching data for transactions: {transactions_with_height[:5]} (showing first 5 only)")
+    #print(f"Fetching data for transactions: {transactions_with_height[:5]} (showing first 5 only)")
     vout_data = rpc_client.rpc_call_batch("getrawtransaction", [{"txid": str(txid), "verbose": 1} for txid, height in transactions_with_height])
 
     vout_rows = []
     for (txid, height), response in zip(transactions_with_height, vout_data):
         if response is not None:
             txid = response['result']['txid']
-            print(f"Processing transaction: {txid}")
+            #print(f"Processing transaction: {txid}")
             for vout in response['result']['vout']:
                 value = vout['value']
                 n = vout['n']
@@ -30,8 +30,8 @@ def fetch_vouts_data(rpc_client, transactions_with_height):
                 if addresses is None:
                     address = scriptPubKey.get('address', None)
                     addresses = [address] if address else []
-                addresses = ",".join(addresses)  # Convert list to comma-separated string
-                print(f"VOUT: Value: {value}, N: {n}, Addresses: {addresses}")
+                addresses = ",".join(addresses)
+                #print(f"VOUT: Value: {value}, N: {n}, Addresses: {addresses}")
                 vout_rows.append((height, txid, value, n, addresses))
         else:
             print(f"No response for transaction: {txid}")
@@ -73,7 +73,7 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
     # Fetch all non-coinbase transactions from the relevant blocks
     transactions_df_filtered = transactions_df.filter(
         (pl.col("height") >= START_BLOCK) & (pl.col("height") <= END_BLOCK) & (~pl.col("is_coinbase"))
-    ).collect()
+    ).sort("height").collect()
 
     transactions_to_fetch = transactions_df_filtered.select(["txid", "height"]).to_numpy().tolist()
     print(f"Total transactions to fetch: {len(transactions_to_fetch)}")
@@ -81,7 +81,7 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
     # Process the transactions in batches
     for i in range(0, len(transactions_to_fetch), BATCH_SIZE):
         batch_transactions = transactions_to_fetch[i:i + BATCH_SIZE]
-        print(f"Processing batch {vout_batch_count + 1}, transactions {i} to {i + BATCH_SIZE}")
+        #print(f"Processing batch {vout_batch_count + 1}, transactions {i} to {i + BATCH_SIZE}")
 
         # VOUT data extraction and batch save
         vout_df = fetch_vouts_data(rpc_client, batch_transactions)
@@ -106,8 +106,8 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
 def save_batch(data, directory, batch_number):
     """Save a batch of data to a parquet file."""
     file_path = os.path.join(directory, f"batch_{batch_number}.parquet")
-    print(f"Saving batch to {file_path}")
-    print(f"Batch data preview:\n{data.head()}\n")
+    #print(f"Saving batch to {file_path}")
+    #print(f"Batch data preview:\n{data.head()}\n")
 
     # Write to Parquet using Polars without compression
     data.write_parquet(file_path, compression=None)
