@@ -1,30 +1,3 @@
-#%% ###################### VOUT DQ ######################
-###################### VOUT DQ ######################
-pd.set_option('display.max_colwidth', 0)
-# Load the necessary data
-transactions_df = dd.read_parquet('_transactions_parquets/*.parquet', columns=['txid', 'is_coinbase'])
-outputs_df = dd.read_parquet('_vout_parquets/*.parquet', columns=['txid'])
-inputs_df = dd.read_parquet('_vin_parquets/*.parquet', columns=['txid'])
-
-# Merge outputs with transactions to determine if they are coinbase or not
-merged_df = dd.merge(outputs_df, transactions_df, on='txid', how='left')
-
-# Filter out coinbase transactions as they don't need matching inputs
-non_coinbase_outputs = merged_df[merged_df['is_coinbase'] == False]
-
-# Check if non-coinbase outputs have corresponding inputs
-# First, rename 'vin_txid' in inputs_df to 'txid' for merging
-# inputs_df = inputs_df.rename(columns={'vin_txid': 'txid'})
-# Perform the merge
-final_merge = dd.merge(non_coinbase_outputs, inputs_df, on='txid', how='left', indicator=True)
-
-# Find outputs that don't have matching inputs
-unmatched_outputs = final_merge[final_merge['_merge'] == 'left_only'].compute()
-
-if unmatched_outputs.empty:
-    print("All non-coinbase outputs have corresponding inputs.")
-else:
-    print(f"Unmatched non-coinbase outputs: {unmatched_outputs}")
 # %% ###################### SUMMARY ######################
      ###################### SUMMARY ######################
 import dask.dataframe as dd

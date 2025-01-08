@@ -18,6 +18,12 @@ This project is focused on extracting Bitcoin blockchain data from Bitcoin Core 
 |                   | `txid`        | `string`  | Transaction ID                  |                |
 |                   | `vin_txid`    | `string`  | Input transactions IDs          |                |
 |                   | `vout`        | `int32`   | Output transaction identifier   |                |
+|                   |               |           |                                 |                |
+| **Vouts**         | `height`      | `Int32`   | Block height                    | Non-Unique     |
+|                   | `txid`        | `Utf8`    | Transaction ID                  |                |
+|                   | `value`       | `Float64` | Value sent in BTC               |                |
+|                   | `n`           | `Int32`   | Output transaction identifier   |                |
+|                   | `addresses`   | `Utf8`    | Receiving addresses             |                |
 
 ## Bitcoin Core setup
 
