@@ -3,7 +3,7 @@ import os
 import polars as pl
 from src.utils.commons import get_current_branch
 
-BATCH_SIZE = 10000
+BATCH_SIZE = 5000
 
 def setup_environment():
     """Set up the environment variables and directories."""
@@ -38,10 +38,13 @@ def process_batches(vins_dir, transactions_dir):
             print(f"No records found for batch: {start_height} to {end_height}")
             continue
 
+        # Crop transactions DataFrame up to end_height
+        cropped_transactions_df = transactions_df.filter(pl.col('height') <= end_height).collect()
+
         # Perform the data quality check for the current batch
         vin_txids = batch_vins_df.select('vin_txid').to_series().to_list()
-        batch_transactions_df = transactions_df.filter(pl.col('txid').is_in(vin_txids)).collect()
-        
+        batch_transactions_df = cropped_transactions_df.filter(pl.col('txid').is_in(vin_txids))
+
         # Ensure that the filtered transactions DataFrame is not empty
         if batch_transactions_df.is_empty():
             print(f"No matching transactions found for batch: {start_height} to {end_height}")

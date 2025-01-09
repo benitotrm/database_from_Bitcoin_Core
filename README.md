@@ -23,7 +23,8 @@ This project is focused on extracting Bitcoin blockchain data from Bitcoin Core 
 |                   | `txid`        | `Utf8`    | Transaction ID                  |                |
 |                   | `value`       | `Float64` | Value sent in BTC               |                |
 |                   | `n`           | `Int32`   | Output transaction identifier   |                |
-|                   | `addresses`   | `Utf8`    | Receiving addresses             |                |
+|                   | `address`     | `Utf8`    | Receiving addresses             |                |
+|                   | `script_type` | `Utf8`    | scriptPubKey type               |                |
 
 ## Bitcoin Core setup
 

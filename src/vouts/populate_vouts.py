@@ -4,6 +4,8 @@ import polars as pl
 from src.api.rpc_client import RPCClient
 from src.utils.commons import (get_current_branch, get_max_block_height_on_file, 
                                consolidate_parquet_files, delete_unconsolidated_directory)
+import hashlib
+import base58
 
 def setup_environment():
     """Set up the environment and print initial information."""
@@ -12,31 +14,65 @@ def setup_environment():
     print(f"Current branch: {branch_name}")
     return 'main' if branch_name == 'main' else 'dev'
 
+def base58check_encode(version, payload):
+    """Encode a payload with a version byte using Base58Check."""
+    versioned_payload = bytes([version]) + payload
+    checksum = hashlib.sha256(hashlib.sha256(versioned_payload).digest()).digest()[:4]
+    return base58.b58encode(versioned_payload + checksum).decode('utf-8')
+
+def derive_address(script_pub_key):
+    """Derive Bitcoin address from scriptPubKey."""
+    script_type = script_pub_key.get('type')
+    asm = script_pub_key.get('asm', "")
+
+    if 'address' in script_pub_key:
+        return script_pub_key['address']
+
+    try:
+        if script_type == "pubkey":
+            pubkey = bytes.fromhex(asm.split()[0])
+            hash160 = hashlib.new('ripemd160', hashlib.sha256(pubkey).digest()).digest()
+            return base58check_encode(0x00, hash160)  # P2PK mainnet
+
+        elif script_type == "pubkeyhash":
+            hash160 = bytes.fromhex(asm.split()[1])
+            return base58check_encode(0x00, hash160)  # P2PKH mainnet
+
+        elif script_type == "scripthash":
+            hash160 = bytes.fromhex(asm.split()[1])
+            return base58check_encode(0x05, hash160)  # P2SH mainnet
+
+    except Exception as e:
+        print(f"Error deriving address for script: {script_pub_key}. Error: {e}")
+
+    return None  # Return None for unsupported or non-standard scripts
+
 def fetch_vouts_data(rpc_client, transactions_with_height):
     """Fetch data for a specific transaction along with height."""
-    #print(f"Fetching data for transactions: {transactions_with_height[:5]} (showing first 5 only)")
     vout_data = rpc_client.rpc_call_batch("getrawtransaction", [{"txid": str(txid), "verbose": 1} for txid, height in transactions_with_height])
 
     vout_rows = []
     for (txid, height), response in zip(transactions_with_height, vout_data):
         if response is not None:
             txid = response['result']['txid']
-            #print(f"Processing transaction: {txid}")
             for vout in response['result']['vout']:
                 value = vout['value']
                 n = vout['n']
-                scriptPubKey = vout.get('scriptPubKey', {})
-                addresses = scriptPubKey.get('addresses', None)
-                if addresses is None:
-                    address = scriptPubKey.get('address', None)
-                    addresses = [address] if address else []
-                addresses = ",".join(addresses)
-                #print(f"VOUT: Value: {value}, N: {n}, Addresses: {addresses}")
-                vout_rows.append((height, txid, value, n, addresses))
+                script_pub_key = vout.get('scriptPubKey', {})
+
+                # Check for 'addresses' field and concatenate all addresses if they exist
+                address = None
+                if 'addresses' in script_pub_key:
+                    address = ",".join(script_pub_key['addresses'])  # Concatenate all addresses with commas
+                else:
+                    address = derive_address(script_pub_key)
+
+                script_type = script_pub_key.get('type', None)
+                vout_rows.append((height, txid, value, n, address, script_type))
         else:
             print(f"No response for transaction: {txid}")
-    
-    return pl.DataFrame(vout_rows, schema=[("height", pl.Int32), ("txid", pl.Utf8), ("value", pl.Float64), ("n", pl.Int32), ("addresses", pl.Utf8)], orient="row")
+
+    return pl.DataFrame(vout_rows, schema=[("height", pl.Int32), ("txid", pl.Utf8), ("value", pl.Float64), ("n", pl.Int32), ("address", pl.Utf8), ("script_type", pl.Utf8)], orient="row")
 
 def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_client):
     # Constants for batch processing
@@ -81,7 +117,6 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
     # Process the transactions in batches
     for i in range(0, len(transactions_to_fetch), BATCH_SIZE):
         batch_transactions = transactions_to_fetch[i:i + BATCH_SIZE]
-        #print(f"Processing batch {vout_batch_count + 1}, transactions {i} to {i + BATCH_SIZE}")
 
         # VOUT data extraction and batch save
         vout_df = fetch_vouts_data(rpc_client, batch_transactions)
@@ -95,7 +130,10 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
         heights_in_batch = [height for _, height in batch_transactions]
         min_height = min(heights_in_batch)
         max_height = max(heights_in_batch)
-        print(f"Processed batch {vout_batch_count}, heights {min_height} to {max_height}")
+
+        # Print status every x batches
+        if vout_batch_count % 1000 == 0:
+            print(f"Processed batch {vout_batch_count}, up to height {max_height}")
 
     # Consolidate and clean up
     print(f"Consolidating batches from {input_directory} into {output_directory}")
@@ -106,10 +144,6 @@ def process_vouts(start_block, end_block, max_block_height_on_file, env, rpc_cli
 def save_batch(data, directory, batch_number):
     """Save a batch of data to a parquet file."""
     file_path = os.path.join(directory, f"batch_{batch_number}.parquet")
-    #print(f"Saving batch to {file_path}")
-    #print(f"Batch data preview:\n{data.head()}\n")
-
-    # Write to Parquet using Polars without compression
     data.write_parquet(file_path, compression=None)
 
 def main():
