@@ -7,7 +7,7 @@ from src.utils.commons import get_current_branch
 pl.Config.set_fmt_str_lengths(100)  # Set max string length to 100 characters
 pl.Config.set_tbl_width_chars(200)  # Adjust table width to 200 characters
 
-BATCH_SIZE = 50000
+BATCH_SIZE = 5000
 
 def setup_environment():
     """Set up the environment variables and directories."""

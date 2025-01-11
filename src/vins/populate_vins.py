@@ -83,13 +83,15 @@ def process_vins(start_block, end_block, max_block_height_on_file, env, rpc_clie
         if not vin_df.empty:
             save_batch(vin_df, input_directory, vins_schema)
             vin_batch_count += 1
-        # print(f"Processed batch {vin_batch_count} (Transactions {i} to {i + BATCH_SIZE})")
 
         # Extract the range of height in the current batch
         heights_in_batch = [height for _, height in batch_transactions]
         min_height = min(heights_in_batch)
         max_height = max(heights_in_batch)
-        print(f"Processed batch {vin_batch_count}, heights {min_height} to {max_height}")
+
+        # Print status every x batches
+        if vin_batch_count % 1000 == 0:
+            print(f"Processed batch {vin_batch_count}, up to height {max_height}")
 
     # Consolidate and clean up
     consolidate_parquet_files(input_directory, output_directory, target_partition_size='2GB', write_index=True)

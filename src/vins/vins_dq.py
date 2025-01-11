@@ -35,7 +35,7 @@ def process_batches(vins_dir, transactions_dir):
 
         # Ensure that the filtered batch DataFrame is not empty
         if batch_vins_df.is_empty():
-            print(f"No records found for batch: {start_height} to {end_height}")
+            print(f"NO RECORDS FOUND for batch: {start_height} to {end_height}")
             continue
 
         # Crop transactions DataFrame up to end_height
@@ -47,10 +47,10 @@ def process_batches(vins_dir, transactions_dir):
 
         # Ensure that the filtered transactions DataFrame is not empty
         if batch_transactions_df.is_empty():
-            print(f"No matching transactions found for batch: {start_height} to {end_height}")
+            print(f"NO MATCHING transactions found for batch: {start_height} to {end_height}")
             continue
 
-        print(f"Batch {start_height} to {end_height} processed successfully with matching vins and transactions.")
+        print(f"COMPLETE match between vins and transactions.")
 
 def main():
     '''Main process for vins_dq.py'''
