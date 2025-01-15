@@ -52,24 +52,23 @@ def consolidate_parquet_files(input_directory, output_directory, target_partitio
     # If reprocessing, include existing files and adjust batch size
     if reprocess:
         new_parquet_files = existing_parquet_files + new_parquet_files
-        batch_size = 10  # Set smaller batch size for reprocessing
+        batch_size = 10
 
     # Process files in batches
     total_files = len(new_parquet_files)
     num_batches = (total_files + batch_size - 1) // batch_size
+
+    print(f"Processing {num_batches} batches")
 
     for batch_num in range(num_batches):
         batch_start = batch_num * batch_size
         batch_end = min((batch_num + 1) * batch_size, total_files)
         batch_files = new_parquet_files[batch_start:batch_end]
         
-        print(f"Processing batch {batch_num + 1}/{num_batches} with files {batch_start} to {batch_end - 1}")
-        
         # Read batch of files
         ddf = dd.read_parquet(batch_files, engine='pyarrow', ignore_divisions=False)
         
         # Ensure that repartitioning happens to the desired target size
-        print(f"Repartitioning to target size {target_partition_size}")
         ddf = ddf.repartition(partition_size=target_partition_size)
         
         # Write the batch to Parquet, without manually setting the name_function
